@@ -36,6 +36,7 @@ export const auth = betterAuth({
   },
   plugins: [
     emailOTP({
+      expiresIn: 900, // 15 minutes
       async sendVerificationOTP({ email, otp }) {
         await resend.emails.send({
           from: "Jijenge <onboarding@resend.dev>",
@@ -44,7 +45,7 @@ export const auth = betterAuth({
           html: `
             <div style="font-family:sans-serif;max-width:480px;margin:auto">
               <h2 style="margin-bottom:8px">Verify your email</h2>
-              <p>Use the code below to complete your sign-up. It expires in 10 minutes.</p>
+              <p>Use the code below to complete your sign-up. It expires in 15 minutes.</p>
               <div style="font-size:36px;font-weight:900;letter-spacing:12px;padding:20px;background:#eef2ff;border:2px solid #1e1b4b;text-align:center;margin:20px 0">
                 ${otp}
               </div>

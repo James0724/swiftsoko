@@ -176,6 +176,16 @@ export function AuthForm() {
     }
   };
 
+  const sendFreshCode = async () => {
+    const { error } = await authClient.emailOtp.sendVerificationOtp({
+      email: regForm.getValues("email"),
+      type: "email-verification",
+    });
+    if (error) throw error;
+    setOtpValue("");
+    setCountdown(30);
+  };
+
   const verifyOTP = async () => {
     if (otpValue.length < 6) {
       toast.error("Please enter the complete 6-digit code.");
@@ -189,7 +199,23 @@ export function AuthForm() {
       });
 
       if (error) {
-        toast.error(getAuthError(error));
+        const msg = (error.message ?? "").toLowerCase();
+        const isExpired = msg.includes("expired") || msg.includes("otp expired");
+
+        // Always unblock resend so the user is never stuck
+        setCountdown(0);
+        setOtpValue("");
+
+        if (isExpired) {
+          try {
+            await sendFreshCode();
+            toast.info("Code expired — a new one has been sent to your email.");
+          } catch {
+            toast.error("Code expired. Click 'Resend' below to get a new one.");
+          }
+        } else {
+          toast.error(getAuthError(error));
+        }
         return;
       }
 
@@ -207,19 +233,8 @@ export function AuthForm() {
     if (countdown > 0) return;
     setLoading(true);
     try {
-      const { error } = await authClient.emailOtp.sendVerificationOtp({
-        email: regForm.getValues("email"),
-        type: "email-verification",
-      });
-
-      if (error) {
-        toast.error(getAuthError(error));
-        return;
-      }
-
+      await sendFreshCode();
       toast.success("A new code has been sent!");
-      setOtpValue("");
-      setCountdown(30);
     } catch {
       toast.error("An error occurred. Please try again.");
     } finally {
