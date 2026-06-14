@@ -10,7 +10,12 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "mongodb" }),
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: [process.env.NEXT_PUBLIC_BETTER_AUTH_URL!],
+  trustedOrigins: [
+    process.env.NEXT_PUBLIC_BETTER_AUTH_URL!,
+    ...(process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+      : []),
+  ],
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
