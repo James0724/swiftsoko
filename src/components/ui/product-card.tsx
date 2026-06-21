@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/use-cart-store";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import type { Product } from "@/lib/data/products";
+import type { Product } from "@/lib/map-product";
 
 export function ProductCard({ product }: { product: Product }) {
   const addItem = useCartStore((state) => state.addItem);

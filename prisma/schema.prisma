@@ -74,17 +74,26 @@ model Account {
   @@map("account")
 }
 
+type ProductImage {
+  url      String
+  publicId String
+}
+
 model Product {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  description String?
-  price       Float
-  sku         String?  @unique
-  stock       Int      @default(0)
-  images      String[] 
+  id            String         @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  slug          String         @unique
+  description   String?
+  price         Float
+  originalPrice Float?
+  sku           String?        @unique
+  stock         Int            @default(0)
+  isFeatured    Boolean        @default(false)
+  coverImage    ProductImage
+  images        ProductImage[]
 
   // Relations
-  accountId   String   
+  accountId   String
   account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   
   // Main Category (Required)

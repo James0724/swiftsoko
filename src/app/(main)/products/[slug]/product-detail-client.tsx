@@ -26,11 +26,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { PRODUCTS, type Product } from "@/lib/data/products";
+import type { Product } from "@/lib/map-product";
 import { useCartStore } from "@/store/use-cart-store";
 import { ProductCard } from "@/components/ui/product-card";
 
-export function ProductDetailClient({ product }: { product: Product }) {
+export function ProductDetailClient({
+  product,
+  related,
+}: {
+  product: Product;
+  related: Product[];
+}) {
   const [quantity, setQuantity] = useState(1);
   const [selectedSize, setSelectedSize] = useState(
     product.sizes?.[1] ?? product.sizes?.[0] ?? ""
@@ -43,10 +49,6 @@ export function ProductDetailClient({ product }: { product: Product }) {
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
-
-  const related = PRODUCTS.filter(
-    (p) => p.categorySlug === product.categorySlug && p.id !== product.id
-  ).slice(0, 4);
 
   const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {

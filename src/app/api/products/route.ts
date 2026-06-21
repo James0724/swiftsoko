@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadProductImage, deleteProductImages } from "@/lib/cloudinary";
+import { resolveCategoryIds } from "@/lib/category";
+import { generateUniqueSlug } from "@/lib/slug";
+import { mapAdminProduct } from "@/lib/map-product";
+
+const MAX_GALLERY_IMAGES = 4;
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
@@ -18,30 +23,40 @@ export async function POST(request: NextRequest) {
 
   const name = (formData.get("name") as string)?.trim();
   const price = parseFloat(formData.get("price") as string);
+  const originalPriceRaw = formData.get("originalPrice") as string;
+  const originalPrice = originalPriceRaw ? parseFloat(originalPriceRaw) : undefined;
   const stock = parseInt(formData.get("stock") as string, 10);
   const sku = (formData.get("sku") as string)?.trim();
   const description = (formData.get("description") as string)?.trim();
-  const details = (formData.get("details") as string)?.trim();
-  const categoryName = (formData.get("category") as string)?.trim();
-  const imageFiles = formData.getAll("images") as File[];
+  const categorySlug = (formData.get("categorySlug") as string)?.trim();
+  const subCategorySlug = (formData.get("subCategorySlug") as string)?.trim() || undefined;
+  const isFeatured = formData.get("isFeatured") === "true";
+  const coverFile = formData.get("cover") as File | null;
+  const imageFiles = (formData.getAll("images") as File[]).filter(
+    (f) => f instanceof File && f.size > 0
+  );
 
-  if (!name || isNaN(price) || !categoryName) {
+  if (!name || isNaN(price) || !categorySlug) {
     return NextResponse.json(
       { error: "Name, price, and category are required" },
       { status: 400 }
     );
   }
-
-  // Look up or create category
-  const slug = categoryName.toLowerCase().replace(/\s+/g, "-");
-  let category = await prisma.category.findUnique({ where: { slug } });
-  if (!category) {
-    category = await prisma.category.create({
-      data: { name: categoryName, slug },
-    });
+  if (!coverFile || coverFile.size === 0) {
+    return NextResponse.json({ error: "A cover image is required" }, { status: 400 });
+  }
+  if (imageFiles.length > MAX_GALLERY_IMAGES) {
+    return NextResponse.json(
+      { error: `You can upload at most ${MAX_GALLERY_IMAGES} gallery images` },
+      { status: 400 }
+    );
   }
 
-  // Look up the user's linked account
+  const categoryIds = await resolveCategoryIds(categorySlug, subCategorySlug);
+  if (!categoryIds) {
+    return NextResponse.json({ error: "Invalid category or subcategory" }, { status: 400 });
+  }
+
   const account = await prisma.account.findFirst({
     where: { userId: session.user.id },
   });
@@ -49,39 +64,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No linked account found" }, { status: 400 });
   }
 
-  // Upload images to Cloudinary product-images folder
+  // Upload cover + gallery images to Cloudinary; roll back everything uploaded
+  // so far if any step fails, to avoid orphaning assets.
   const uploaded: { publicId: string; url: string }[] = [];
-  const validFiles = imageFiles.filter((f) => f instanceof File && f.size > 0);
-
+  let cover: { publicId: string; url: string };
   try {
-    for (const file of validFiles) {
-      const result = await uploadProductImage(file);
-      uploaded.push(result);
+    cover = await uploadProductImage(coverFile);
+    uploaded.push(cover);
+    for (const file of imageFiles) {
+      uploaded.push(await uploadProductImage(file));
     }
-  } catch (err) {
-    // Roll back any partial uploads to prevent orphaned images
+  } catch {
     await deleteProductImages(uploaded.map((i) => i.publicId));
     return NextResponse.json({ error: "Image upload failed" }, { status: 500 });
   }
 
-  // Save product to DB; roll back images on failure
+  const gallery = uploaded.slice(1);
+  const slug = await generateUniqueSlug(name);
+
   try {
     const product = await prisma.product.create({
       data: {
         name,
+        slug,
         price,
+        originalPrice,
         stock: isNaN(stock) ? 0 : stock,
         sku: sku || undefined,
-        description: [details, description].filter(Boolean).join("\n\n") || undefined,
-        images: uploaded.map((i) => i.url),
-        categoryId: category.id,
+        description: description || undefined,
+        isFeatured,
+        coverImage: cover,
+        images: gallery,
+        categoryId: categoryIds.categoryId,
+        subCategoryId: categoryIds.subCategoryId ?? undefined,
         userId: session.user.id,
         accountId: account.id,
       },
+      include: { category: true, subCategory: true },
     });
-    return NextResponse.json({ product }, { status: 201 });
+    return NextResponse.json({ product: mapAdminProduct(product) }, { status: 201 });
   } catch (err) {
-    // DB create failed — delete the uploaded images to prevent orphans
     await deleteProductImages(uploaded.map((i) => i.publicId));
     console.error("Product create failed:", err);
     return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
@@ -97,7 +119,8 @@ export async function GET(request: NextRequest) {
   const products = await prisma.product.findMany({
     where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
+    include: { category: true, subCategory: true },
   });
 
-  return NextResponse.json({ products });
+  return NextResponse.json({ products: products.map(mapAdminProduct) });
 }

@@ -15,13 +15,11 @@ import {
   Tag,
   TrendingUp,
 } from "lucide-react";
-import { PRODUCTS } from "@/lib/data/products";
 import { CATEGORIES } from "@/lib/data/categories";
+import { prisma } from "@/lib/prisma";
+import { mapProduct } from "@/lib/map-product";
 
-const FEATURED = PRODUCTS.filter((p) => p.isFeatured).slice(0, 4);
-const ON_SALE = PRODUCTS.filter((p) => p.isOnSale).slice(0, 4);
-const TOP_RATED = [...PRODUCTS].sort((a, b) => b.rating - a.rating).slice(0, 4);
-const NEW_ARRIVALS = PRODUCTS.filter((p) => p.isNew).slice(0, 4);
+export const dynamic = "force-dynamic";
 
 const CATEGORY_IMAGES: Record<string, string> = {
   electronics:
@@ -42,7 +40,18 @@ const CATEGORY_IMAGES: Record<string, string> = {
     "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?q=80&w=600",
 };
 
-export default function Home() {
+export default async function Home() {
+  const rows = await prisma.product.findMany({
+    include: { category: true, subCategory: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const allProducts = rows.map(mapProduct);
+
+  const FEATURED = allProducts.filter((p) => p.isFeatured).slice(0, 4);
+  const ON_SALE = allProducts.filter((p) => p.isOnSale).slice(0, 4);
+  const NEW_ARRIVALS = allProducts.filter((p) => p.isNew).slice(0, 4);
+  const TOP_RATED = allProducts.slice(0, 4);
+
   return (
     <div className="min-h-screen bg-white font-sans text-black">
       {/* FLASH SALE BAR */}

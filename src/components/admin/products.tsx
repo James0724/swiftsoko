@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   LayoutDashboard, Briefcase, ShoppingCart, Settings,
   PackageSearch, Pencil, Trash2,
@@ -10,9 +10,19 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { AddProductModal } from "../modals/product-form-modal";
-import { PRODUCTS, type Product } from "@/lib/data/products";
+import { CATEGORIES } from "@/lib/data/categories";
+import type { AdminProduct } from "@/lib/map-product";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+const MAX_GALLERY_IMAGES = 4;
+
+// ─── Mock data (orders/reviews are not part of the product CRUD fix) ─────────
 const MOCK_ORDERS = [
   { id: "ORD-001", customer: "James Kahoro", email: "james@example.com", items: 3, total: 12450, status: "delivered", payment: "M-Pesa", date: "2026-06-10", products: ["T-01 Modular Bag", "Ghost Shell Jacket"] },
   { id: "ORD-002", customer: "Amina Ochieng", email: "amina@example.com", items: 1, total: 4200, status: "processing", payment: "Card", date: "2026-06-11", products: ["Swift Runner X1"] },
@@ -39,19 +49,34 @@ const STATUS_CONFIG: Record<string, { color: string; label: string; icon: React.
 };
 
 // ─── Main component ───────────────────────────────────────────────────────────
-const ProductDashboard = () => {
+const ProductDashboard = ({ initialProducts }: { initialProducts: AdminProduct[] }) => {
   const [activeTab, setActiveTab] = useState("Dashboard");
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [products, setProducts] = useState<AdminProduct[]>(initialProducts);
+  const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [orderSearch, setOrderSearch] = useState("");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [reviewStatusFilter, setReviewStatusFilter] = useState("all");
   const [reviews, setReviews] = useState(MOCK_REVIEWS);
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    setDeleteConfirm(null);
+  const handleDeleteProduct = async (id: string) => {
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        toast.error(json.error ?? "Failed to delete product");
+        return;
+      }
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      toast.success("Product deleted");
+    } catch {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setDeleting(null);
+      setDeleteConfirm(null);
+    }
   };
 
   const filteredOrders = MOCK_ORDERS.filter((o) => {
@@ -67,7 +92,18 @@ const ProductDashboard = () => {
   const renderContent = () => {
     switch (activeTab) {
       case "Dashboard": return <DashboardOverview products={products} />;
-      case "Products":  return <ProductsSection products={products} onDelete={(id: string) => setDeleteConfirm(id)} onEdit={setEditingProduct} deleteConfirm={deleteConfirm} onConfirmDelete={handleDeleteProduct} onCancelDelete={() => setDeleteConfirm(null)} />;
+      case "Products":  return (
+        <ProductsSection
+          products={products}
+          onDelete={(id: string) => setDeleteConfirm(id)}
+          onEdit={setEditingProduct}
+          deleteConfirm={deleteConfirm}
+          deleting={deleting}
+          onConfirmDelete={handleDeleteProduct}
+          onCancelDelete={() => setDeleteConfirm(null)}
+          onCreated={(p: AdminProduct) => setProducts((prev) => [p, ...prev])}
+        />
+      );
       case "Orders":    return <OrdersSection orders={filteredOrders} search={orderSearch} onSearch={setOrderSearch} statusFilter={orderStatusFilter} onStatusFilter={setOrderStatusFilter} />;
       case "Reviews":   return <ReviewsSection reviews={filteredReviews} statusFilter={reviewStatusFilter} onStatusFilter={setReviewStatusFilter} onUpdateStatus={(id: string, status: string) => setReviews((prev) => prev.map((r) => r.id === id ? { ...r, status } : r))} />;
       default: return null;
@@ -103,7 +139,14 @@ const ProductDashboard = () => {
       </main>
 
       {editingProduct && (
-        <EditProductModal product={editingProduct} onClose={() => setEditingProduct(null)} onSave={(updated) => { setProducts((prev) => prev.map((p) => p.id === updated.id ? updated : p)); setEditingProduct(null); }} />
+        <EditProductModal
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+          onSave={(updated) => {
+            setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+            setEditingProduct(null);
+          }}
+        />
       )}
     </div>
   );
@@ -121,7 +164,7 @@ const SidebarItem = ({ icon, label, active, onClick, activeColor }: any) => (
 );
 
 // ─── Dashboard Overview ───────────────────────────────────────────────────────
-const DashboardOverview = ({ products }: { products: Product[] }) => {
+const DashboardOverview = ({ products }: { products: AdminProduct[] }) => {
   const totalRevenue = MOCK_ORDERS.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
   const totalOrders = MOCK_ORDERS.length;
   const pendingOrders = MOCK_ORDERS.filter(o => o.status === "pending" || o.status === "processing").length;
@@ -144,7 +187,7 @@ const DashboardOverview = ({ products }: { products: Product[] }) => {
           { label: "Total Revenue", value: `KSh ${totalRevenue.toLocaleString()}`, icon: <DollarSign size={28} strokeWidth={3} />, color: "bg-green-300", change: "+12% this week" },
           { label: "Total Orders",  value: totalOrders,   icon: <ShoppingCart size={28} strokeWidth={3} />, color: "bg-cyan-300",   change: `${pendingOrders} pending` },
           { label: "Products Live", value: products.length, icon: <Briefcase size={28} strokeWidth={3} />,  color: "bg-yellow-300", change: `${lowStock} low stock` },
-          { label: "Avg Rating",   value: "4.4★",         icon: <Star size={28} strokeWidth={3} />,        color: "bg-purple-300", change: "Based on 5 reviews" },
+          { label: "Featured",   value: products.filter(p => p.isFeatured).length,  icon: <Star size={28} strokeWidth={3} />,        color: "bg-purple-300", change: "Shown on homepage" },
         ].map(({ label, value, icon, color, change }) => (
           <div key={label} className={`${color} border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-5`}>
             <div className="flex items-start justify-between mb-3">
@@ -186,17 +229,21 @@ const DashboardOverview = ({ products }: { products: Product[] }) => {
             <h3 className="font-black uppercase tracking-tight">Low Stock Alert</h3>
           </div>
           <div className="divide-y-2 divide-black">
-            {products.filter(p => p.stock < 10).slice(0, 5).map((p) => (
-              <div key={p.id} className="flex items-center justify-between px-6 py-3">
-                <div>
-                  <p className="font-black text-sm">{p.name}</p>
-                  <p className="text-xs font-bold text-gray-500 uppercase">{p.sku}</p>
+            {products.length === 0 ? (
+              <p className="px-6 py-8 text-center font-bold text-sm text-gray-400 uppercase">No products yet</p>
+            ) : (
+              products.filter(p => p.stock < 10).slice(0, 5).map((p) => (
+                <div key={p.id} className="flex items-center justify-between px-6 py-3">
+                  <div>
+                    <p className="font-black text-sm">{p.name}</p>
+                    <p className="text-xs font-bold text-gray-500 uppercase">{p.sku || "—"}</p>
+                  </div>
+                  <div className={`px-3 py-1 border-2 border-black font-black text-xs ${p.stock < 3 ? "bg-red-300" : "bg-orange-200"}`}>
+                    {p.stock} left
+                  </div>
                 </div>
-                <div className={`px-3 py-1 border-2 border-black font-black text-xs ${p.stock < 3 ? "bg-red-300" : "bg-orange-200"}`}>
-                  {p.stock} left
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -205,9 +252,9 @@ const DashboardOverview = ({ products }: { products: Product[] }) => {
 };
 
 // ─── Products Section ─────────────────────────────────────────────────────────
-const ProductsSection = ({ products, onDelete, onEdit, deleteConfirm, onConfirmDelete, onCancelDelete }: any) => {
+const ProductsSection = ({ products, onDelete, onEdit, deleteConfirm, deleting, onConfirmDelete, onCancelDelete, onCreated }: any) => {
   const [search, setSearch] = useState("");
-  const filtered = products.filter((p: Product) =>
+  const filtered = products.filter((p: AdminProduct) =>
     p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -218,7 +265,7 @@ const ProductsSection = ({ products, onDelete, onEdit, deleteConfirm, onConfirmD
           <h1 className="text-4xl font-black uppercase italic tracking-tighter">Products</h1>
           <p className="font-bold text-sm text-gray-500 uppercase">{products.length} total products</p>
         </div>
-        <AddProductModal />
+        <AddProductModal onCreated={onCreated} />
       </div>
 
       <div className="relative">
@@ -242,13 +289,13 @@ const ProductsSection = ({ products, onDelete, onEdit, deleteConfirm, onConfirmD
             <table className="w-full">
               <thead>
                 <tr className="bg-indigo-950 text-white text-left">
-                  {["Product", "SKU", "Category", "Price", "Stock", "Rating", "Actions"].map((h) => (
+                  {["Product", "SKU", "Category", "Price", "Stock", "Actions"].map((h) => (
                     <th key={h} className="px-5 py-4 font-black uppercase text-[10px] tracking-widest border-r border-indigo-800 last:border-0">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y-2 divide-black">
-                {filtered.map((product: Product) => (
+                {filtered.map((product: AdminProduct) => (
                   <tr key={product.id} className="hover:bg-yellow-50 transition-colors">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
@@ -260,11 +307,12 @@ const ProductsSection = ({ products, onDelete, onEdit, deleteConfirm, onConfirmD
                           <div className="flex gap-1 mt-0.5">
                             {product.isNew && <span className="bg-cyan-300 text-[8px] font-black uppercase px-1.5 py-0.5 border border-black">NEW</span>}
                             {product.isOnSale && <span className="bg-red-300 text-[8px] font-black uppercase px-1.5 py-0.5 border border-black">SALE</span>}
+                            {product.isFeatured && <span className="bg-purple-300 text-[8px] font-black uppercase px-1.5 py-0.5 border border-black">FEATURED</span>}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-5 py-3 font-bold text-xs text-gray-500 uppercase">{product.sku}</td>
+                    <td className="px-5 py-3 font-bold text-xs text-gray-500 uppercase">{product.sku || "—"}</td>
                     <td className="px-5 py-3 font-bold text-xs uppercase">{product.category}</td>
                     <td className="px-5 py-3">
                       <p className="font-black text-sm">KSh {product.price.toLocaleString()}</p>
@@ -275,17 +323,14 @@ const ProductsSection = ({ products, onDelete, onEdit, deleteConfirm, onConfirmD
                         {product.stock}
                       </span>
                     </td>
-                    <td className="px-5 py-3 font-bold text-sm">
-                      <span className="flex items-center gap-1">
-                        <Star size={12} className="fill-yellow-400 text-yellow-400" />
-                        {product.rating} ({product.reviews})
-                      </span>
-                    </td>
                     <td className="px-5 py-3">
                       {deleteConfirm === product.id ? (
                         <div className="flex items-center gap-2">
-                          <button onClick={() => onConfirmDelete(product.id)} className="bg-red-500 text-white px-3 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-red-700 transition-colors">Confirm</button>
-                          <button onClick={onCancelDelete} className="bg-white px-3 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-gray-100 transition-colors">Cancel</button>
+                          <button onClick={() => onConfirmDelete(product.id)} disabled={deleting === product.id} className="bg-red-500 text-white px-3 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-1">
+                            {deleting === product.id && <Loader2 size={12} className="animate-spin" />}
+                            Confirm
+                          </button>
+                          <button onClick={onCancelDelete} disabled={deleting === product.id} className="bg-white px-3 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-gray-100 transition-colors disabled:opacity-50">Cancel</button>
                         </div>
                       ) : (
                         <div className="flex gap-2">
@@ -440,22 +485,57 @@ const ReviewsSection = ({ reviews, statusFilter, onStatusFilter, onUpdateStatus 
 );
 
 // ─── Edit Product Modal ───────────────────────────────────────────────────────
-const EditProductModal = ({ product, onClose, onSave }: { product: Product; onClose: () => void; onSave: (p: Product) => void }) => {
-  const [form, setForm] = useState({ ...product });
-  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
-  const [newPreviews, setNewPreviews] = useState<string[]>([]);
+const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct; onClose: () => void; onSave: (p: AdminProduct) => void }) => {
+  const [form, setForm] = useState({
+    name: product.name,
+    price: product.price,
+    originalPrice: product.originalPrice ?? "",
+    stock: product.stock,
+    sku: product.sku,
+    description: product.description,
+    isFeatured: !!product.isFeatured,
+    categorySlug: product.categorySlug,
+    subCategorySlug: product.subCategorySlug,
+  });
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [keptGallery, setKeptGallery] = useState(product.galleryImages);
+  const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
+  const [newGalleryPreviews, setNewGalleryPreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleChange = (field: keyof Product, value: any) => {
+  const subcategories = useMemo(
+    () => CATEGORIES.find((c) => c.slug === form.categorySlug)?.subcategories ?? [],
+    [form.categorySlug]
+  );
+  const gallerySlotsLeft = MAX_GALLERY_IMAGES - keptGallery.length - newGalleryFiles.length;
+
+  const handleChange = (field: keyof typeof form, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    const fileArray = Array.from(files);
-    setNewImageFiles(fileArray);
-    setNewPreviews(fileArray.map((f) => URL.createObjectURL(f)));
+    const fileArray = Array.from(files).slice(0, gallerySlotsLeft);
+    setNewGalleryFiles((prev) => [...prev, ...fileArray]);
+    setNewGalleryPreviews((prev) => [...prev, ...fileArray.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const removeKeptImage = (publicId: string) => {
+    setKeptGallery((prev) => prev.filter((img) => img.publicId !== publicId));
+  };
+
+  const removeNewImage = (index: number) => {
+    setNewGalleryFiles((prev) => prev.filter((_, i) => i !== index));
+    setNewGalleryPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSave = async () => {
@@ -464,10 +544,16 @@ const EditProductModal = ({ product, onClose, onSave }: { product: Product; onCl
       const formData = new FormData();
       formData.append("name", String(form.name ?? ""));
       formData.append("price", String(form.price ?? ""));
+      formData.append("originalPrice", String(form.originalPrice ?? ""));
       formData.append("stock", String(form.stock ?? ""));
       formData.append("sku", String(form.sku ?? ""));
       formData.append("description", String(form.description ?? ""));
-      newImageFiles.forEach((file) => formData.append("images", file));
+      formData.append("isFeatured", String(!!form.isFeatured));
+      if (form.categorySlug) formData.append("categorySlug", form.categorySlug);
+      if (form.subCategorySlug) formData.append("subCategorySlug", form.subCategorySlug);
+      if (coverFile) formData.append("cover", coverFile);
+      keptGallery.forEach((img) => formData.append("keepImage", img.publicId));
+      newGalleryFiles.forEach((file) => formData.append("images", file));
 
       const res = await fetch(`/api/products/${product.id}`, {
         method: "PUT",
@@ -482,7 +568,7 @@ const EditProductModal = ({ product, onClose, onSave }: { product: Product; onCl
       }
 
       toast.success("Product updated successfully");
-      onSave(form);
+      onSave(json.product as AdminProduct);
     } catch {
       toast.error("An unexpected error occurred");
     } finally {
@@ -499,63 +585,111 @@ const EditProductModal = ({ product, onClose, onSave }: { product: Product; onCl
         </div>
 
         <div className="p-8 space-y-5">
-          {([["name","Product Name","text"],["price","Price (KSh)","number"],["originalPrice","Original Price (KSh)","number"],["stock","Stock Level","number"],["sku","SKU","text"],["brand","Brand","text"]] as [keyof Product, string, string][]).map(([field, label, type]) => (
+          {([["name","Product Name","text"],["price","Price (KSh)","number"],["originalPrice","Original Price (KSh)","number"],["stock","Stock Level","number"],["sku","SKU","text"]] as [keyof typeof form, string, string][]).map(([field, label, type]) => (
             <div key={field} className="space-y-1">
               <label className="font-black uppercase text-xs">{label}</label>
               <input type={type} value={(form as any)[field] ?? ""} onChange={(e) => handleChange(field, type === "number" ? Number(e.target.value) : e.target.value)} className="w-full h-12 px-4 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50" />
             </div>
           ))}
 
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="font-black uppercase text-xs">Category</label>
+              <Select
+                value={form.categorySlug}
+                onValueChange={(v) => {
+                  handleChange("categorySlug", v);
+                  handleChange("subCategorySlug", "");
+                }}
+              >
+                <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.slug} value={cat.slug}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="font-black uppercase text-xs">Subcategory</label>
+              <Select
+                value={form.subCategorySlug}
+                onValueChange={(v) => handleChange("subCategorySlug", v)}
+                disabled={subcategories.length === 0}
+              >
+                <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
+                  <SelectValue placeholder="Optional" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subcategories.map((sub) => (
+                    <SelectItem key={sub.slug} value={sub.slug}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div className="space-y-1">
             <label className="font-black uppercase text-xs">Description</label>
             <textarea value={form.description} onChange={(e) => handleChange("description", e.target.value)} rows={4} className="w-full px-4 py-3 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50 resize-none" />
           </div>
 
-          {/* Image update section */}
+          {/* Cover image */}
           <div className="space-y-2">
-            <label className="font-black uppercase text-xs">Replace Images</label>
-            <label className="flex items-center gap-3 cursor-pointer border-4 border-dashed border-black px-4 py-3 hover:bg-cyan-50 transition-colors">
-              <Upload size={18} strokeWidth={3} />
-              <span className="font-bold text-sm uppercase">
-                {newImageFiles.length > 0
-                  ? `${newImageFiles.length} new image(s) selected`
-                  : "Click to select replacement images"}
-              </span>
-              <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} />
-            </label>
-            {newPreviews.length > 0 && (
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {newPreviews.map((src, i) => (
-                  <div key={i} className="aspect-square border-2 border-black overflow-hidden">
-                    <img src={src} alt="new preview" className="w-full h-full object-cover" />
-                  </div>
-                ))}
+            <label className="font-black uppercase text-xs">Cover Image</label>
+            <div className="flex gap-3 items-start">
+              <div className="w-24 h-24 border-2 border-black overflow-hidden shrink-0">
+                <img src={coverPreview ?? product.image} alt="cover" className="w-full h-full object-cover" />
               </div>
-            )}
-            {newPreviews.length === 0 && form.image && (
-              <div className="flex gap-2 mt-2">
-                <div className="w-16 h-16 border-2 border-black overflow-hidden">
-                  <img src={form.image} alt="current" className="w-full h-full object-cover" />
-                </div>
-                <p className="text-xs font-bold text-gray-500 uppercase self-center">Current image — upload new to replace</p>
-              </div>
-            )}
+              <label className="flex-1 flex items-center gap-3 cursor-pointer border-4 border-dashed border-black px-4 py-3 hover:bg-cyan-50 transition-colors">
+                <Upload size={18} strokeWidth={3} />
+                <span className="font-bold text-sm uppercase">
+                  {coverFile ? "New cover selected" : "Click to replace cover"}
+                </span>
+                <input type="file" accept="image/*" className="hidden" onChange={handleCoverChange} />
+              </label>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 font-bold text-sm cursor-pointer">
-              <input type="checkbox" checked={!!form.isNew} onChange={(e) => handleChange("isNew", e.target.checked)} className="w-4 h-4 border-2 border-black" />
-              Mark as New
-            </label>
-            <label className="flex items-center gap-2 font-bold text-sm cursor-pointer">
-              <input type="checkbox" checked={!!form.isOnSale} onChange={(e) => handleChange("isOnSale", e.target.checked)} className="w-4 h-4 border-2 border-black" />
-              On Sale
-            </label>
-            <label className="flex items-center gap-2 font-bold text-sm cursor-pointer">
-              <input type="checkbox" checked={!!form.isFeatured} onChange={(e) => handleChange("isFeatured", e.target.checked)} className="w-4 h-4 border-2 border-black" />
-              Featured
-            </label>
+          {/* Gallery images */}
+          <div className="space-y-2">
+            <label className="font-black uppercase text-xs">Gallery Images (up to {MAX_GALLERY_IMAGES})</label>
+            <div className="grid grid-cols-4 gap-2">
+              {keptGallery.map((img) => (
+                <div key={img.publicId} className="relative aspect-square border-2 border-black overflow-hidden">
+                  <img src={img.url} alt="gallery" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => removeKeptImage(img.publicId)} className="absolute -top-2 -right-2 bg-red-500 border-2 border-black p-0.5">
+                    <X size={12} className="text-white" />
+                  </button>
+                </div>
+              ))}
+              {newGalleryPreviews.map((src, i) => (
+                <div key={i} className="relative aspect-square border-2 border-black overflow-hidden">
+                  <img src={src} alt="new gallery" className="w-full h-full object-cover" />
+                  <button type="button" onClick={() => removeNewImage(i)} className="absolute -top-2 -right-2 bg-red-500 border-2 border-black p-0.5">
+                    <X size={12} className="text-white" />
+                  </button>
+                </div>
+              ))}
+              {gallerySlotsLeft > 0 && (
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center border-4 border-dashed border-black bg-gray-50 hover:bg-cyan-50 transition-colors">
+                  <Upload size={20} strokeWidth={3} />
+                  <input type="file" multiple accept="image/*" className="hidden" onChange={handleGalleryChange} />
+                </label>
+              )}
+            </div>
           </div>
+
+          <label className="flex items-center gap-2 font-bold text-sm cursor-pointer">
+            <input type="checkbox" checked={!!form.isFeatured} onChange={(e) => handleChange("isFeatured", e.target.checked)} className="w-4 h-4 border-2 border-black" />
+            Feature on homepage
+          </label>
         </div>
 
         <div className="px-8 py-5 border-t-4 border-black bg-gray-50 flex justify-end gap-3">

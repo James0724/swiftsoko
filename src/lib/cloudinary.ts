@@ -21,7 +21,7 @@ cloudinary.config({
   secure: true,
 });
 
-const PRODUCT_IMAGES_FOLDER = "product-images";
+const PRODUCT_IMAGES_FOLDER = "products";
 
 export async function uploadProductImage(
   file: File
@@ -56,16 +56,6 @@ export async function deleteProductImage(publicId: string): Promise<void> {
 export async function deleteProductImages(publicIds: string[]): Promise<void> {
   if (!publicIds.length) return;
   await Promise.allSettled(publicIds.map(deleteProductImage));
-}
-
-/** Extracts the Cloudinary public_id from a secure_url. */
-export function extractPublicId(url: string): string {
-  // e.g. https://res.cloudinary.com/demo/image/upload/v1234/product-images/abc.jpg
-  // → product-images/abc
-  const parts = url.split("/upload/");
-  if (parts.length < 2) return "";
-  const afterUpload = parts[1].replace(/^v\d+\//, "");
-  return afterUpload.replace(/\.[^/.]+$/, "");
 }
 
 export { cloudinary };

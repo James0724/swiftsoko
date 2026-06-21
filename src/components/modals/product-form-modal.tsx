@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -18,24 +18,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { CATEGORIES } from "@/lib/data/categories";
+import type { AdminProduct } from "@/lib/map-product";
+
+const MAX_GALLERY_IMAGES = 4;
 
 const productSchema = z.object({
   name: z.string().min(2, "Name is required"),
   price: z.coerce.number().min(0.01, "Price must be greater than 0"),
-  discount: z.coerce.number().min(0).max(100).default(0),
+  originalPrice: z.coerce.number().min(0).optional().or(z.literal("")),
   stock: z.coerce.number().min(0, "Stock cannot be negative"),
-  category: z.string().min(1, "Category is required"),
+  categorySlug: z.string().min(1, "Category is required"),
+  subCategorySlug: z.string().optional(),
   description: z.string().min(10, "Description is too short"),
-  details: z.string().min(2, "Product detail is required"),
-  sku: z.string().min(1, "SKU is required"),
-  images: z.any(),
+  sku: z.string().optional(),
+  isFeatured: z.boolean().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
-export function AddProductModal() {
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [imageFiles, setImageFiles] = useState<File[]>([]);
+export function AddProductModal({
+  onCreated,
+}: {
+  onCreated?: (product: AdminProduct) => void;
+}) {
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,47 +61,77 @@ export function AddProductModal() {
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
     defaultValues: {
       name: "",
       price: 0,
-      discount: 0,
       stock: 0,
-      category: "",
+      categorySlug: "",
+      subCategorySlug: "",
       sku: "",
       description: "",
-      details: "",
+      isFeatured: false,
     },
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files) return;
-    const fileArray = Array.from(files);
-    setImageFiles(fileArray);
-    const newPreviews = fileArray.map((file) => URL.createObjectURL(file));
-    setPreviews(newPreviews);
+  const selectedCategorySlug = watch("categorySlug");
+  const subcategories = useMemo(
+    () => CATEGORIES.find((c) => c.slug === selectedCategorySlug)?.subcategories ?? [],
+    [selectedCategorySlug]
+  );
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
   };
 
-  const removeImage = (index: number) => {
-    setImageFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
+  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const fileArray = Array.from(files).slice(0, MAX_GALLERY_IMAGES - galleryFiles.length);
+    setGalleryFiles((prev) => [...prev, ...fileArray]);
+    setGalleryPreviews((prev) => [...prev, ...fileArray.map((f) => URL.createObjectURL(f))]);
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setGalleryFiles((prev) => prev.filter((_, i) => i !== index));
+    setGalleryPreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const resetForm = () => {
+    reset();
+    setCoverFile(null);
+    setCoverPreview(null);
+    setGalleryFiles([]);
+    setGalleryPreviews([]);
   };
 
   const onSubmit: SubmitHandler<ProductFormValues> = async (data) => {
+    if (!coverFile) {
+      toast.error("A cover image is required");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const formData = new FormData();
       formData.append("name", data.name);
       formData.append("price", String(data.price));
+      if (data.originalPrice) formData.append("originalPrice", String(data.originalPrice));
       formData.append("stock", String(data.stock));
-      formData.append("sku", data.sku);
+      formData.append("sku", data.sku ?? "");
       formData.append("description", data.description);
-      formData.append("details", data.details);
-      formData.append("category", data.category);
-      imageFiles.forEach((file) => formData.append("images", file));
+      formData.append("categorySlug", data.categorySlug);
+      if (data.subCategorySlug) formData.append("subCategorySlug", data.subCategorySlug);
+      formData.append("isFeatured", String(!!data.isFeatured));
+      formData.append("cover", coverFile);
+      galleryFiles.forEach((file) => formData.append("images", file));
 
       const res = await fetch("/api/products", {
         method: "POST",
@@ -98,9 +146,8 @@ export function AddProductModal() {
       }
 
       toast.success("Product created successfully");
-      reset();
-      setImageFiles([]);
-      setPreviews([]);
+      onCreated?.(json.product as AdminProduct);
+      resetForm();
       setOpen(false);
     } catch {
       toast.error("An unexpected error occurred");
@@ -183,13 +230,13 @@ export function AddProductModal() {
                     </div>
                     <div className="space-y-2">
                       <Label className="font-black uppercase text-sm">
-                        Discount (%)
+                        Original Price (Ksh)
                       </Label>
                       <Input
                         type="number"
-                        {...register("discount")}
+                        {...register("originalPrice")}
                         className="h-12 rounded-none border-4 border-black font-bold focus-visible:ring-0"
-                        placeholder="e.g. 10"
+                        placeholder="For sale pricing"
                       />
                     </div>
                   </div>
@@ -220,21 +267,69 @@ export function AddProductModal() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="font-black uppercase text-sm">
-                      Category
-                    </Label>
-                    <Input
-                      {...register("category")}
-                      className="h-12 rounded-none border-4 border-black font-bold focus-visible:ring-0"
-                      placeholder="e.g. Electronics"
-                    />
-                    {errors.category && (
-                      <p className="text-red-600 font-bold text-[10px] italic">
-                        {errors.category.message}
-                      </p>
-                    )}
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="font-black uppercase text-sm">
+                        Category
+                      </Label>
+                      <Select
+                        value={selectedCategorySlug}
+                        onValueChange={(v) => {
+                          setValue("categorySlug", v);
+                          setValue("subCategorySlug", "");
+                        }}
+                      >
+                        <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.slug} value={cat.slug}>
+                              {cat.icon} {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.categorySlug && (
+                        <p className="text-red-600 font-bold text-[10px] italic">
+                          {errors.categorySlug.message}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-black uppercase text-sm">
+                        Subcategory
+                      </Label>
+                      <Select
+                        value={watch("subCategorySlug")}
+                        onValueChange={(v) => setValue("subCategorySlug", v)}
+                        disabled={subcategories.length === 0}
+                      >
+                        <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
+                          <SelectValue placeholder="Optional" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {subcategories.map((sub) => (
+                            <SelectItem key={sub.slug} value={sub.slug}>
+                              {sub.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <Checkbox
+                      checked={!!watch("isFeatured")}
+                      onCheckedChange={(v) => setValue("isFeatured", !!v)}
+                      className="w-5 h-5 rounded-none border-2 border-black"
+                    />
+                    <span className="font-black uppercase text-sm">
+                      Feature on homepage
+                    </span>
+                  </label>
                 </section>
 
                 <section className="space-y-4">
@@ -243,19 +338,9 @@ export function AddProductModal() {
                       02
                     </span>
                     <h3 className="font-black uppercase italic text-lg">
-                      Specifications
+                      Description
                     </h3>
                   </div>
-                  <Textarea
-                    {...register("details")}
-                    placeholder="Write short intro or details of the product..."
-                    className="min-h-12.5 rounded-none border-4 border-black font-medium text-lg focus-visible:ring-0"
-                  />
-                  {errors.details && (
-                    <p className="text-red-600 font-bold text-[10px] italic">
-                      {errors.details.message}
-                    </p>
-                  )}
                   <Textarea
                     {...register("description")}
                     placeholder="Describe the product features or marketing write up..."
@@ -277,50 +362,94 @@ export function AddProductModal() {
                       03
                     </span>
                     <h3 className="font-black uppercase italic text-lg">
-                      Visual Assets
+                      Cover Image
                     </h3>
                   </div>
 
-                  <div className="space-y-4">
+                  {coverPreview ? (
+                    <div className="relative aspect-square border-4 border-black">
+                      <img
+                        src={coverPreview}
+                        alt="cover preview"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCoverFile(null);
+                          setCoverPreview(null);
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 border-2 border-black p-1"
+                      >
+                        <X size={14} className="text-white" />
+                      </button>
+                    </div>
+                  ) : (
                     <Label
-                      htmlFor="image-upload"
+                      htmlFor="cover-upload"
                       className="group relative flex aspect-square cursor-pointer flex-col items-center justify-center border-4 border-dashed border-black bg-gray-50 hover:bg-cyan-50 transition-colors"
                     >
-                      <Upload size={48} strokeWidth={3} />
+                      <Upload size={40} strokeWidth={3} />
                       <p className="mt-4 font-black uppercase text-center px-4 text-xs">
-                        Click to Upload Product Photographs
+                        Click to Upload Cover Image
                       </p>
                       <input
-                        id="image-upload"
+                        id="cover-upload"
                         type="file"
-                        multiple
                         accept="image/*"
                         className="hidden"
-                        onChange={handleImageChange}
+                        onChange={handleCoverChange}
                       />
                     </Label>
+                  )}
+                </section>
 
-                    <div className="grid grid-cols-3 gap-2">
-                      {previews.map((src, i) => (
-                        <div
-                          key={i}
-                          className="relative aspect-square border-2 border-black"
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 border-b-4 border-black pb-2">
+                    <span className="bg-black text-white px-2 py-0.5 text-xs font-black">
+                      04
+                    </span>
+                    <h3 className="font-black uppercase italic text-lg">
+                      Gallery Images (up to {MAX_GALLERY_IMAGES})
+                    </h3>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {galleryPreviews.map((src, i) => (
+                      <div
+                        key={i}
+                        className="relative aspect-square border-2 border-black"
+                      >
+                        <img
+                          src={src}
+                          alt="gallery preview"
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeGalleryImage(i)}
+                          className="absolute -top-2 -right-2 bg-red-500 border-2 border-black p-0.5"
                         >
-                          <img
-                            src={src}
-                            alt="preview"
-                            className="h-full w-full object-cover"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeImage(i)}
-                            className="absolute -top-2 -right-2 bg-red-500 border-2 border-black p-0.5"
-                          >
-                            <X size={12} className="text-white" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                          <X size={12} className="text-white" />
+                        </button>
+                      </div>
+                    ))}
+                    {galleryFiles.length < MAX_GALLERY_IMAGES && (
+                      <Label
+                        htmlFor="gallery-upload"
+                        className="flex aspect-square cursor-pointer flex-col items-center justify-center border-4 border-dashed border-black bg-gray-50 hover:bg-cyan-50 transition-colors"
+                      >
+                        <Upload size={20} strokeWidth={3} />
+                        <input
+                          id="gallery-upload"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleGalleryChange}
+                        />
+                      </Label>
+                    )}
                   </div>
                 </section>
               </div>
