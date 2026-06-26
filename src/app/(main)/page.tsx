@@ -47,10 +47,16 @@ export default async function Home() {
   });
   const allProducts = rows.map(mapProduct);
 
-  const FEATURED = allProducts.filter((p) => p.sections.includes("FEATURED")).slice(0, 4);
-  const ON_SALE = allProducts.filter((p) => p.sections.includes("FLASH_DEALS")).slice(0, 4);
+  const FEATURED = allProducts
+    .filter((p) => p.sections.includes("FEATURED"))
+    .slice(0, 4);
+  const ON_SALE = allProducts
+    .filter((p) => p.sections.includes("FLASH_DEALS"))
+    .slice(0, 4);
   const NEW_ARRIVALS = allProducts.filter((p) => p.isNew).slice(0, 4);
-  const TOP_RATED = allProducts.filter((p) => p.sections.includes("TOP_RATED")).slice(0, 4);
+  const TOP_RATED = allProducts
+    .filter((p) => p.sections.includes("TOP_RATED"))
+    .slice(0, 4);
 
   return (
     <div className="min-h-screen bg-white font-sans text-black">
@@ -345,7 +351,7 @@ export default async function Home() {
             View All <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
           {FEATURED.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
@@ -404,7 +410,7 @@ export default async function Home() {
               See All <ArrowUpRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
             {TOP_RATED.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -493,7 +499,7 @@ export default async function Home() {
             All New <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 lg:gap-6">
           {NEW_ARRIVALS.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}
