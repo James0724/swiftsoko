@@ -492,7 +492,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
                 {paginated.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
@@ -501,7 +501,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
 
             {/* PAGINATION */}
             {totalPages > 1 && (
-              <div className="mt-10 flex items-center justify-center gap-1">
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-1">
                 <Button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
@@ -556,7 +556,16 @@ export function ProductsContent({ products }: { products: Product[] }) {
             <div className="p-5">
               <SidebarContent />
             </div>
-            <div className="p-5 border-t-2 border-black sticky bottom-0 bg-white">
+            <div className="p-5 border-t-2 border-black sticky bottom-0 bg-white space-y-2">
+              {activeFilterCount > 0 && (
+                <Button
+                  onClick={() => { clearAllFilters(); setSidebarOpen(false); }}
+                  variant="outline"
+                  className="w-full rounded-none border-2 border-black font-black uppercase tracking-widest"
+                >
+                  View All Products ({products.length})
+                </Button>
+              )}
               <Button
                 onClick={() => setSidebarOpen(false)}
                 className="w-full rounded-none bg-black text-white font-black uppercase tracking-widest border-2 border-black"

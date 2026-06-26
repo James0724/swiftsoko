@@ -14,6 +14,9 @@ interface CartStore {
   openCart: () => void;
   closeCart: () => void;
   addItem: (item: CartItem) => void;
+  increaseQty: (id: number) => void;
+  decreaseQty: (id: number) => void;
+  removeItem: (id: number) => void;
 }
 
 export const useCartStore = create<CartStore>((set) => ({
@@ -34,4 +37,18 @@ export const useCartStore = create<CartStore>((set) => ({
       }
       return { items: [...state.items, { ...newItem, qty: 1 }], isOpen: true };
     }),
+  increaseQty: (id) =>
+    set((state) => ({
+      items: state.items.map((i) => (i.id === id ? { ...i, qty: i.qty + 1 } : i)),
+    })),
+  decreaseQty: (id) =>
+    set((state) => ({
+      items: state.items
+        .map((i) => (i.id === id ? { ...i, qty: i.qty - 1 } : i))
+        .filter((i) => i.qty > 0),
+    })),
+  removeItem: (id) =>
+    set((state) => ({
+      items: state.items.filter((i) => i.id !== id),
+    })),
 }));

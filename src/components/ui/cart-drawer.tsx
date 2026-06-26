@@ -20,7 +20,7 @@ import {
 import { useCartStore } from "@/store/use-cart-store";
 
 export function CartDrawer() {
-  const { isOpen, closeCart, items } = useCartStore();
+  const { isOpen, closeCart, items, increaseQty, decreaseQty, removeItem } = useCartStore();
 
   const subtotal = items.reduce((acc, item) => acc + item.price * item.qty, 0);
   const freeShippingThreshold = 500;
@@ -28,7 +28,10 @@ export function CartDrawer() {
 
   return (
     <Sheet open={isOpen} onOpenChange={closeCart}>
-      <SheetContent className="w-full sm:max-w-md p-0 gap-0 border-l-4 border-black flex flex-col">
+      <SheetContent
+        showCloseButton={false}
+        className="w-full sm:max-w-md p-0 gap-0 border-l-4 border-black flex flex-col"
+      >
         {/* HEADER */}
         <SheetHeader className="p-6 border-b-4 border-black bg-white">
           <div className="flex justify-between items-center">
@@ -91,18 +94,27 @@ export function CartDrawer() {
                     <h4 className="font-black uppercase italic text-sm tracking-tighter leading-none">
                       {item.name}
                     </h4>
-                    <button className="text-gray-400 hover:text-red-600">
+                    <button
+                      onClick={() => removeItem(item.id)}
+                      className="text-gray-400 hover:text-red-600"
+                    >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
 
                   <div className="flex justify-between items-center">
                     <div className="flex border-2 border-black h-8 items-center">
-                      <button className="px-2 hover:bg-gray-100 border-r-2 border-black h-full">
+                      <button
+                        onClick={() => decreaseQty(item.id)}
+                        className="px-2 hover:bg-gray-100 border-r-2 border-black h-full"
+                      >
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="px-3 font-black text-xs">{item.qty}</span>
-                      <button className="px-2 hover:bg-gray-100 border-l-2 border-black h-full">
+                      <button
+                        onClick={() => increaseQty(item.id)}
+                        className="px-2 hover:bg-gray-100 border-l-2 border-black h-full"
+                      >
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
