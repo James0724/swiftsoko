@@ -53,7 +53,7 @@ export function ProductDetailClient({
 
   const handleAddToCart = () => {
     for (let i = 0; i < quantity; i++) {
-      addItem(product as any);
+      addItem({ ...product, img: product.image } as any);
     }
     openCart();
   };

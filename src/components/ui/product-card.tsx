@@ -67,7 +67,7 @@ export function ProductCard({ product }: { product: Product }) {
           className="w-full rounded-none border-2 border-black bg-white text-black font-black uppercase hover:bg-black hover:text-white transition-all py-6 active:translate-y-1 active:shadow-none text-xs"
           onClick={(e) => {
             e.preventDefault();
-            addItem(product as any);
+            addItem({ ...product, img: product.image } as any);
           }}
         >
           Add to Bag <Plus className="ml-2 w-4 h-4" />
