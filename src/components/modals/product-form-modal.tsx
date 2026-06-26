@@ -16,9 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -27,6 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CATEGORIES } from "@/lib/data/categories";
+import { PRODUCT_SECTIONS } from "@/lib/product-sections";
+import { countWords, SHORT_DESCRIPTION_MAX_WORDS } from "@/lib/sanitize-html";
 import type { AdminProduct } from "@/lib/map-product";
 
 const MAX_GALLERY_IMAGES = 4;
@@ -38,9 +40,17 @@ const productSchema = z.object({
   stock: z.coerce.number().min(0, "Stock cannot be negative"),
   categorySlug: z.string().min(1, "Category is required"),
   subCategorySlug: z.string().optional(),
+  shortDescription: z
+    .string()
+    .trim()
+    .min(1, "Short description is required")
+    .refine(
+      (text) => countWords(text) <= SHORT_DESCRIPTION_MAX_WORDS,
+      `Short description must be ${SHORT_DESCRIPTION_MAX_WORDS} words or fewer`
+    ),
   description: z.string().min(10, "Description is too short"),
   sku: z.string().optional(),
-  isFeatured: z.boolean().optional(),
+  sections: z.array(z.string()).default([]),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -73,8 +83,9 @@ export function AddProductModal({
       categorySlug: "",
       subCategorySlug: "",
       sku: "",
+      shortDescription: "",
       description: "",
-      isFeatured: false,
+      sections: [],
     },
   });
 
@@ -126,10 +137,11 @@ export function AddProductModal({
       if (data.originalPrice) formData.append("originalPrice", String(data.originalPrice));
       formData.append("stock", String(data.stock));
       formData.append("sku", data.sku ?? "");
+      formData.append("shortDescription", data.shortDescription);
       formData.append("description", data.description);
       formData.append("categorySlug", data.categorySlug);
       if (data.subCategorySlug) formData.append("subCategorySlug", data.subCategorySlug);
-      formData.append("isFeatured", String(!!data.isFeatured));
+      formData.append("sections", JSON.stringify(data.sections ?? []));
       formData.append("cover", coverFile);
       galleryFiles.forEach((file) => formData.append("images", file));
 
@@ -320,16 +332,34 @@ export function AddProductModal({
                     </div>
                   </div>
 
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <Checkbox
-                      checked={!!watch("isFeatured")}
-                      onCheckedChange={(v) => setValue("isFeatured", !!v)}
-                      className="w-5 h-5 rounded-none border-2 border-black"
-                    />
-                    <span className="font-black uppercase text-sm">
-                      Feature on homepage
-                    </span>
-                  </label>
+                  <div className="space-y-2">
+                    <Label className="font-black uppercase text-sm">
+                      Homepage Sections
+                    </Label>
+                    <div className="flex flex-wrap gap-4">
+                      {PRODUCT_SECTIONS.map((section) => (
+                        <label
+                          key={section.value}
+                          className="flex items-center gap-2 cursor-pointer"
+                        >
+                          <Checkbox
+                            checked={watch("sections")?.includes(section.value)}
+                            onCheckedChange={(checked) => {
+                              const current = watch("sections") ?? [];
+                              setValue(
+                                "sections",
+                                checked
+                                  ? [...current, section.value]
+                                  : current.filter((s) => s !== section.value)
+                              );
+                            }}
+                            className="w-5 h-5 rounded-none border-2 border-black"
+                          />
+                          <span className="font-bold text-sm">{section.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </section>
 
                 <section className="space-y-4">
@@ -338,13 +368,42 @@ export function AddProductModal({
                       02
                     </span>
                     <h3 className="font-black uppercase italic text-lg">
+                      Short Description
+                    </h3>
+                  </div>
+                  <textarea
+                    {...register("shortDescription")}
+                    placeholder="A short tagline or highlights..."
+                    className="w-full min-h-20 p-4 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50"
+                  />
+                  <div className="flex items-center justify-between">
+                    {errors.shortDescription ? (
+                      <p className="text-red-600 font-bold text-[10px] italic">
+                        {errors.shortDescription.message}
+                      </p>
+                    ) : (
+                      <span />
+                    )}
+                    <p className="font-bold text-[10px] uppercase opacity-60">
+                      {countWords(watch("shortDescription") ?? "")}/{SHORT_DESCRIPTION_MAX_WORDS} words
+                    </p>
+                  </div>
+                </section>
+
+                <section className="space-y-4">
+                  <div className="flex items-center gap-2 border-b-4 border-black pb-2">
+                    <span className="bg-black text-white px-2 py-0.5 text-xs font-black">
+                      03
+                    </span>
+                    <h3 className="font-black uppercase italic text-lg">
                       Description
                     </h3>
                   </div>
-                  <Textarea
-                    {...register("description")}
+                  <RichTextEditor
+                    value={watch("description")}
+                    onChange={(html) => setValue("description", html)}
                     placeholder="Describe the product features or marketing write up..."
-                    className="min-h-37.5 rounded-none border-4 border-black font-medium text-lg focus-visible:ring-0"
+                    minHeightClass="min-h-37.5"
                   />
                   {errors.description && (
                     <p className="text-red-600 font-bold text-[10px] italic">
@@ -359,7 +418,7 @@ export function AddProductModal({
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 border-b-4 border-black pb-2">
                     <span className="bg-black text-white px-2 py-0.5 text-xs font-black">
-                      03
+                      04
                     </span>
                     <h3 className="font-black uppercase italic text-lg">
                       Cover Image
@@ -407,7 +466,7 @@ export function AddProductModal({
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 border-b-4 border-black pb-2">
                     <span className="bg-black text-white px-2 py-0.5 text-xs font-black">
-                      04
+                      05
                     </span>
                     <h3 className="font-black uppercase italic text-lg">
                       Gallery Images (up to {MAX_GALLERY_IMAGES})

@@ -5,12 +5,18 @@ import { uploadProductImage, deleteProductImages } from "@/lib/cloudinary";
 import { resolveCategoryIds } from "@/lib/category";
 import { generateUniqueSlug } from "@/lib/slug";
 import { mapAdminProduct } from "@/lib/map-product";
+import {
+  sanitizeProductHtml,
+  countWords,
+  SHORT_DESCRIPTION_MAX_WORDS,
+} from "@/lib/sanitize-html";
+import { sanitizeSections } from "@/lib/product-sections";
 
 const MAX_GALLERY_IMAGES = 4;
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
+  if (!session || (session.user as { role?: string }).role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -27,10 +33,16 @@ export async function POST(request: NextRequest) {
   const originalPrice = originalPriceRaw ? parseFloat(originalPriceRaw) : undefined;
   const stock = parseInt(formData.get("stock") as string, 10);
   const sku = (formData.get("sku") as string)?.trim();
+  const shortDescription = (formData.get("shortDescription") as string)?.trim();
   const description = (formData.get("description") as string)?.trim();
   const categorySlug = (formData.get("categorySlug") as string)?.trim();
   const subCategorySlug = (formData.get("subCategorySlug") as string)?.trim() || undefined;
-  const isFeatured = formData.get("isFeatured") === "true";
+  let sections: string[] = [];
+  try {
+    sections = sanitizeSections(JSON.parse((formData.get("sections") as string) ?? "[]"));
+  } catch {
+    sections = [];
+  }
   const coverFile = formData.get("cover") as File | null;
   const imageFiles = (formData.getAll("images") as File[]).filter(
     (f) => f instanceof File && f.size > 0
@@ -39,6 +51,19 @@ export async function POST(request: NextRequest) {
   if (!name || isNaN(price) || !categorySlug) {
     return NextResponse.json(
       { error: "Name, price, and category are required" },
+      { status: 400 }
+    );
+  }
+  const shortDescriptionWords = countWords(shortDescription ?? "");
+  if (shortDescriptionWords === 0) {
+    return NextResponse.json(
+      { error: "Short description is required" },
+      { status: 400 }
+    );
+  }
+  if (shortDescriptionWords > SHORT_DESCRIPTION_MAX_WORDS) {
+    return NextResponse.json(
+      { error: `Short description must be ${SHORT_DESCRIPTION_MAX_WORDS} words or fewer` },
       { status: 400 }
     );
   }
@@ -91,8 +116,9 @@ export async function POST(request: NextRequest) {
         originalPrice,
         stock: isNaN(stock) ? 0 : stock,
         sku: sku || undefined,
-        description: description || undefined,
-        isFeatured,
+        shortDescription: shortDescription || undefined,
+        description: description ? sanitizeProductHtml(description) : undefined,
+        sections,
         coverImage: cover,
         images: gallery,
         categoryId: categoryIds.categoryId,
@@ -112,12 +138,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
+  if (!session || (session.user as { role?: string }).role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const products = await prisma.product.findMany({
-    where: { userId: session.user.id },
     orderBy: { createdAt: "desc" },
     include: { category: true, subCategory: true },
   });

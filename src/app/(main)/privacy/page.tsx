@@ -6,7 +6,7 @@ const SECTIONS = [
     id: "1",
     title: "Who We Are & Scope",
     content: [
-      "Jijenge Swiftsoko is a digital marketplace operated in the Republic of Kenya. This Privacy Policy explains how we collect, use, store, share, and protect your personal data when you use our Platform — including our website, mobile applications, and any related services.",
+      "Jijenge Swiftsoko is an online retailer operated in the Republic of Kenya. This Privacy Policy explains how we collect, use, store, share, and protect your personal data when you use our Platform — including our website, mobile applications, and any related services.",
       "This Policy is compliant with the Data Protection Act, No. 24 of 2019 (\"DPA\") of the Republic of Kenya and the implementing regulations thereunder. We are registered as a data controller with the Office of the Data Protection Commissioner (ODPC) of Kenya.",
       "By using our Platform, you acknowledge that you have read and understood this Privacy Policy and consent to the collection and processing of your personal data as described herein. You may withdraw consent at any time, subject to legal and contractual limitations.",
     ],
@@ -15,10 +15,10 @@ const SECTIONS = [
     id: "2",
     title: "Data We Collect",
     content: [
-      "Account & Identity Data: When you register, we collect your name, email address, phone number, and optionally your profile photograph. Sellers additionally provide business name, KRA PIN (for tax compliance), and bank/mobile money account details.",
+      "Account & Identity Data: When you register, we collect your name, email address, phone number, and optionally your profile photograph.",
       "Transaction Data: We collect records of purchases, payments, refunds, and disputes. This includes order amounts, payment method references (not full card numbers — we use tokenised, PCI-DSS compliant payment processors), and delivery addresses.",
       "Usage & Device Data: We automatically collect data about how you interact with the Platform, including pages viewed, search queries, click patterns, device type, operating system, browser, IP address, and approximate geolocation (city-level only).",
-      "Communications Data: When you contact our support team, submit reviews, or communicate with Sellers through the Platform, we retain those communications to resolve disputes and improve service quality.",
+      "Communications Data: When you contact our support team or submit reviews, we retain those communications to resolve disputes and improve service quality.",
       "Cookies & Tracking Technologies: We use strictly necessary cookies (essential for Platform function), analytical cookies (anonymised usage statistics), and preference cookies (to remember your settings). We do not use third-party advertising trackers without your explicit consent. You can manage cookie preferences in your account settings.",
     ],
   },
@@ -27,11 +27,11 @@ const SECTIONS = [
     title: "How We Use Your Data",
     content: [
       "To fulfil your orders: Processing payments, coordinating delivery, handling returns, and communicating order status updates.",
-      "To operate your account: Authentication, account management, Seller onboarding, and personalising your experience.",
+      "To operate your account: Authentication, account management, and personalising your experience.",
       "To improve our Platform: Analysing aggregated, anonymised usage data to improve features, fix bugs, and develop new services.",
       "To comply with the law: Meeting our obligations under Kenyan tax law (through the Kenya Revenue Authority), anti-money laundering regulations, and responding to lawful requests from law enforcement or regulatory authorities.",
       "To communicate with you: Sending order confirmations, security alerts, and — with your consent — promotional offers, product recommendations, and platform updates. You may opt out of marketing communications at any time via the unsubscribe link in any email or by updating your account settings.",
-      "To detect and prevent fraud: Monitoring for suspicious activity, protecting Buyers and Sellers from scams, and maintaining platform integrity.",
+      "To detect and prevent fraud: Monitoring for suspicious activity, protecting Customers from scams, and maintaining platform integrity.",
     ],
   },
   {
@@ -52,7 +52,6 @@ const SECTIONS = [
       "We do not sell your personal data. We share your data only with trusted parties and only to the extent necessary:",
       "Delivery Partners: Your name, phone number, and delivery address are shared with courier and logistics partners solely to fulfil your order.",
       "Payment Processors: Transaction data is shared with PCI-DSS compliant payment processors (M-Pesa/Safaricom and card processors). We receive only transaction references — we never store full card numbers.",
-      "Sellers: When you place an order, the Seller receives your name, order details, and delivery information sufficient to fulfil the order. Sellers do not receive your payment credentials.",
       "Legal Authorities: We may disclose your data when required by a valid court order, summons, or lawful request from a Kenyan regulatory authority such as the Communications Authority, KRA, or law enforcement.",
       "Service Providers: We use carefully vetted third-party providers for hosting, analytics, email delivery, and customer support tooling. All providers are bound by data processing agreements and may not use your data for their own purposes.",
     ],
@@ -124,7 +123,7 @@ const SECTIONS = [
       "Email: privacy@jijengeswiftsoko.co.ke",
       "Postal address: Data Protection Officer, Jijenge Swiftsoko, Westlands Commercial Centre, Nairobi, Kenya",
       "Alternatively, you may file a complaint directly with the Office of the Data Protection Commissioner (ODPC), P.O. Box 41079-00100, Nairobi, Kenya. Website: odpc.go.ke.",
-      "This Privacy Policy was last updated on 12 June 2026 and is effective immediately.",
+      "This Privacy Policy was last updated on 26 June 2026 and is effective immediately.",
     ],
   },
 ];
@@ -144,7 +143,7 @@ export default function PrivacyPage() {
             </div>
             <div>
               <h1 className="text-4xl font-black uppercase italic tracking-tighter text-white">Privacy Protocol</h1>
-              <p className="text-white/60 font-bold text-xs uppercase tracking-widest">Last updated: 12 June 2026 · DPA 2019 Compliant</p>
+              <p className="text-white/60 font-bold text-xs uppercase tracking-widest">Last updated: 26 June 2026 · DPA 2019 Compliant</p>
             </div>
           </div>
         </div>

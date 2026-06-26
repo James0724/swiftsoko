@@ -123,6 +123,14 @@
     border-color: var(--border);
   }
 
+  html {
+    /* The collapsing navbar resizes content above the viewport; without
+       this, the browser's scroll anchoring "corrects" scrollY to
+       compensate, which our scroll-direction listener then misreads as
+       user input and bounces the header back open. */
+    overflow-anchor: none;
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);

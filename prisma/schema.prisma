@@ -81,15 +81,16 @@ type ProductImage {
 
 model Product {
   id            String         @id @default(auto()) @map("_id") @db.ObjectId
-  name          String
-  slug          String         @unique
-  description   String?
-  price         Float
-  originalPrice Float?
-  sku           String?        @unique
-  stock         Int            @default(0)
-  isFeatured    Boolean        @default(false)
-  coverImage    ProductImage
+  name             String
+  slug             String         @unique
+  shortDescription String?
+  description      String?
+  price            Float
+  originalPrice    Float?
+  sku              String?        @unique
+  stock            Int            @default(0)
+  sections         String[]       @default([])
+  coverImage       ProductImage
   images        ProductImage[]
 
   // Relations

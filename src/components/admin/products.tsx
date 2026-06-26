@@ -11,6 +11,9 @@ import {
 import { toast } from "sonner";
 import { AddProductModal } from "../modals/product-form-modal";
 import { CATEGORIES } from "@/lib/data/categories";
+import { PRODUCT_SECTIONS } from "@/lib/product-sections";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { countWords, SHORT_DESCRIPTION_MAX_WORDS } from "@/lib/sanitize-html";
 import type { AdminProduct } from "@/lib/map-product";
 import {
   Select,
@@ -187,7 +190,7 @@ const DashboardOverview = ({ products }: { products: AdminProduct[] }) => {
           { label: "Total Revenue", value: `KSh ${totalRevenue.toLocaleString()}`, icon: <DollarSign size={28} strokeWidth={3} />, color: "bg-green-300", change: "+12% this week" },
           { label: "Total Orders",  value: totalOrders,   icon: <ShoppingCart size={28} strokeWidth={3} />, color: "bg-cyan-300",   change: `${pendingOrders} pending` },
           { label: "Products Live", value: products.length, icon: <Briefcase size={28} strokeWidth={3} />,  color: "bg-yellow-300", change: `${lowStock} low stock` },
-          { label: "Featured",   value: products.filter(p => p.isFeatured).length,  icon: <Star size={28} strokeWidth={3} />,        color: "bg-purple-300", change: "Shown on homepage" },
+          { label: "Featured",   value: products.filter(p => p.sections?.includes("FEATURED")).length,  icon: <Star size={28} strokeWidth={3} />,        color: "bg-purple-300", change: "Shown on homepage" },
         ].map(({ label, value, icon, color, change }) => (
           <div key={label} className={`${color} border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-5`}>
             <div className="flex items-start justify-between mb-3">
@@ -307,7 +310,7 @@ const ProductsSection = ({ products, onDelete, onEdit, deleteConfirm, deleting, 
                           <div className="flex gap-1 mt-0.5">
                             {product.isNew && <span className="bg-cyan-300 text-[8px] font-black uppercase px-1.5 py-0.5 border border-black">NEW</span>}
                             {product.isOnSale && <span className="bg-red-300 text-[8px] font-black uppercase px-1.5 py-0.5 border border-black">SALE</span>}
-                            {product.isFeatured && <span className="bg-purple-300 text-[8px] font-black uppercase px-1.5 py-0.5 border border-black">FEATURED</span>}
+                            {product.sections?.includes("FEATURED") && <span className="bg-purple-300 text-[8px] font-black uppercase px-1.5 py-0.5 border border-black">FEATURED</span>}
                           </div>
                         </div>
                       </div>
@@ -492,8 +495,9 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
     originalPrice: product.originalPrice ?? "",
     stock: product.stock,
     sku: product.sku,
+    shortDescription: product.shortDescription,
     description: product.description,
-    isFeatured: !!product.isFeatured,
+    sections: product.sections ?? [],
     categorySlug: product.categorySlug,
     subCategorySlug: product.subCategorySlug,
   });
@@ -503,6 +507,14 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
   const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
   const [newGalleryPreviews, setNewGalleryPreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  const shortDescriptionWords = countWords(form.shortDescription ?? "");
+  const shortDescriptionError =
+    shortDescriptionWords === 0
+      ? "Short description is required"
+      : shortDescriptionWords > SHORT_DESCRIPTION_MAX_WORDS
+      ? `Short description must be ${SHORT_DESCRIPTION_MAX_WORDS} words or fewer`
+      : null;
 
   const subcategories = useMemo(
     () => CATEGORIES.find((c) => c.slug === form.categorySlug)?.subcategories ?? [],
@@ -539,6 +551,10 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
   };
 
   const handleSave = async () => {
+    if (shortDescriptionError) {
+      toast.error(shortDescriptionError);
+      return;
+    }
     setSubmitting(true);
     try {
       const formData = new FormData();
@@ -547,11 +563,13 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
       formData.append("originalPrice", String(form.originalPrice ?? ""));
       formData.append("stock", String(form.stock ?? ""));
       formData.append("sku", String(form.sku ?? ""));
+      formData.append("shortDescription", String(form.shortDescription ?? ""));
       formData.append("description", String(form.description ?? ""));
-      formData.append("isFeatured", String(!!form.isFeatured));
+      formData.append("sections", JSON.stringify(form.sections ?? []));
       if (form.categorySlug) formData.append("categorySlug", form.categorySlug);
       if (form.subCategorySlug) formData.append("subCategorySlug", form.subCategorySlug);
       if (coverFile) formData.append("cover", coverFile);
+      formData.append("galleryTouched", "1");
       keptGallery.forEach((img) => formData.append("keepImage", img.publicId));
       newGalleryFiles.forEach((file) => formData.append("images", file));
 
@@ -636,8 +654,33 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
           </div>
 
           <div className="space-y-1">
+            <label className="font-black uppercase text-xs">Short Description</label>
+            <textarea
+              value={form.shortDescription ?? ""}
+              onChange={(e) => handleChange("shortDescription", e.target.value)}
+              placeholder="A short tagline or highlights..."
+              className="w-full min-h-20 p-4 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50"
+            />
+            <div className="flex items-center justify-between">
+              {shortDescriptionError ? (
+                <p className="text-red-600 font-bold text-[10px] italic">{shortDescriptionError}</p>
+              ) : (
+                <span />
+              )}
+              <p className="font-bold text-[10px] uppercase opacity-60">
+                {shortDescriptionWords}/{SHORT_DESCRIPTION_MAX_WORDS} words
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1">
             <label className="font-black uppercase text-xs">Description</label>
-            <textarea value={form.description} onChange={(e) => handleChange("description", e.target.value)} rows={4} className="w-full px-4 py-3 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50 resize-none" />
+            <RichTextEditor
+              value={form.description ?? ""}
+              onChange={(html) => handleChange("description", html)}
+              placeholder="Describe the product features or marketing write up..."
+              minHeightClass="min-h-37.5"
+            />
           </div>
 
           {/* Cover image */}
@@ -686,17 +729,36 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
             </div>
           </div>
 
-          <label className="flex items-center gap-2 font-bold text-sm cursor-pointer">
-            <input type="checkbox" checked={!!form.isFeatured} onChange={(e) => handleChange("isFeatured", e.target.checked)} className="w-4 h-4 border-2 border-black" />
-            Feature on homepage
-          </label>
+          <div className="space-y-2">
+            <label className="font-black uppercase text-xs">Homepage Sections</label>
+            <div className="flex flex-wrap gap-4">
+              {PRODUCT_SECTIONS.map((section) => (
+                <label key={section.value} className="flex items-center gap-2 font-bold text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.sections.includes(section.value)}
+                    onChange={(e) =>
+                      handleChange(
+                        "sections",
+                        e.target.checked
+                          ? [...form.sections, section.value]
+                          : form.sections.filter((s) => s !== section.value)
+                      )
+                    }
+                    className="w-4 h-4 border-2 border-black"
+                  />
+                  {section.label}
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="px-8 py-5 border-t-4 border-black bg-gray-50 flex justify-end gap-3">
           <button onClick={onClose} disabled={submitting} className="px-6 py-3 border-4 border-black font-black uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50">Cancel</button>
           <button
             onClick={handleSave}
-            disabled={submitting}
+            disabled={submitting || !!shortDescriptionError}
             className="px-8 py-3 bg-cyan-300 border-4 border-black font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-x-0 disabled:translate-y-0 disabled:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2"
           >
             {submitting && <Loader2 size={16} className="animate-spin" />}

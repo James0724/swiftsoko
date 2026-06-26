@@ -13,7 +13,6 @@ const NAV_LINKS = [
 const SUPPORT_LINKS = [
   { label: "Contact Support", href: "mailto:support@jijengeswiftsoko.co.ke" },
   { label: "WhatsApp Orders", href: "https://wa.me/254700000000" },
-  { label: "Sell With Us", href: "#" },
   { label: "Track Your Order", href: "/orders" },
   { label: "FAQ", href: "/returns#faq" },
 ];

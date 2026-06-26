@@ -47,10 +47,10 @@ export default async function Home() {
   });
   const allProducts = rows.map(mapProduct);
 
-  const FEATURED = allProducts.filter((p) => p.isFeatured).slice(0, 4);
-  const ON_SALE = allProducts.filter((p) => p.isOnSale).slice(0, 4);
+  const FEATURED = allProducts.filter((p) => p.sections.includes("FEATURED")).slice(0, 4);
+  const ON_SALE = allProducts.filter((p) => p.sections.includes("FLASH_DEALS")).slice(0, 4);
   const NEW_ARRIVALS = allProducts.filter((p) => p.isNew).slice(0, 4);
-  const TOP_RATED = allProducts.slice(0, 4);
+  const TOP_RATED = allProducts.filter((p) => p.sections.includes("TOP_RATED")).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-white font-sans text-black">

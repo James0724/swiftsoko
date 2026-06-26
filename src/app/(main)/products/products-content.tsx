@@ -33,9 +33,14 @@ export function ProductsContent({ products }: { products: Product[] }) {
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category") ?? "";
 
+  const maxPrice = useMemo(
+    () => Math.max(500, ...products.map((p) => p.price)),
+    [products]
+  );
+
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
-  const [priceRange, setPriceRange] = useState([0, 500]);
+  const [priceRange, setPriceRange] = useState([0, maxPrice]);
   const [minRating, setMinRating] = useState(0);
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
@@ -65,7 +70,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
   const clearAllFilters = () => {
     setSelectedCategory("");
     setSelectedSubcategory("");
-    setPriceRange([0, 500]);
+    setPriceRange([0, maxPrice]);
     setMinRating(0);
     setOnSaleOnly(false);
     setInStockOnly(false);
@@ -144,7 +149,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
   const activeFilterCount = [
     selectedCategory,
     selectedSubcategory,
-    priceRange[0] > 0 || priceRange[1] < 500,
+    priceRange[0] > 0 || priceRange[1] < maxPrice,
     minRating > 0,
     onSaleOnly,
     inStockOnly,
@@ -251,7 +256,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
         <div className="px-2 space-y-4">
           <Slider
             min={0}
-            max={500}
+            max={maxPrice}
             step={10}
             value={priceRange}
             onValueChange={(v) => { setPriceRange(v); setCurrentPage(1); }}
@@ -376,9 +381,9 @@ export function ProductsContent({ products }: { products: Product[] }) {
                 <X className="w-3 h-3 ml-1" />
               </Badge>
             )}
-            {(priceRange[0] > 0 || priceRange[1] < 500) && (
+            {(priceRange[0] > 0 || priceRange[1] < maxPrice) && (
               <Badge
-                onClick={() => setPriceRange([0, 500])}
+                onClick={() => setPriceRange([0, maxPrice])}
                 className="rounded-none border-2 border-black bg-green-100 text-black font-bold cursor-pointer hover:bg-red-100 flex items-center gap-1"
               >
                 KSh {priceRange[0]}–{priceRange[1]}

@@ -11,12 +11,13 @@ export interface Product {
   subCategory: string;
   subCategorySlug: string;
   isNew?: boolean;
-  isFeatured?: boolean;
   isOnSale?: boolean;
+  sections: string[];
   image: string;
   images: string[];
   rating: number;
   reviews: number;
+  shortDescription: string;
   description: string;
   stock: number;
   sku: string;
@@ -51,12 +52,13 @@ export function mapProduct(product: ProductWithRelations): Product {
     subCategory: product.subCategory?.name ?? "",
     subCategorySlug: product.subCategory?.slug ?? "",
     isNew,
-    isFeatured: product.isFeatured,
     isOnSale,
+    sections: product.sections ?? [],
     image: product.coverImage.url,
     images: [product.coverImage.url, ...product.images.map((i) => i.url)],
     rating: 0,
     reviews: 0,
+    shortDescription: product.shortDescription ?? "",
     description: product.description ?? "",
     stock: product.stock,
     sku: product.sku ?? "",

@@ -5,6 +5,12 @@ import { uploadProductImage, deleteProductImages } from "@/lib/cloudinary";
 import { resolveCategoryIds } from "@/lib/category";
 import { generateUniqueSlug } from "@/lib/slug";
 import { mapAdminProduct } from "@/lib/map-product";
+import {
+  sanitizeProductHtml,
+  countWords,
+  SHORT_DESCRIPTION_MAX_WORDS,
+} from "@/lib/sanitize-html";
+import { sanitizeSections } from "@/lib/product-sections";
 
 const MAX_GALLERY_IMAGES = 4;
 
@@ -13,15 +19,13 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
+  if (!session || (session.user as { role?: string }).role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
 
-  const existing = await prisma.product.findFirst({
-    where: { id, userId: session.user.id },
-  });
+  const existing = await prisma.product.findFirst({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
@@ -40,6 +44,7 @@ export async function PUT(
   );
   const keepPublicIds = (formData.getAll("keepImage") as string[]).filter(Boolean);
   const keptImages = existing.images.filter((img) => keepPublicIds.includes(img.publicId));
+  const galleryTouched = formData.has("galleryTouched");
 
   if (keptImages.length + newGalleryFiles.length > MAX_GALLERY_IMAGES) {
     return NextResponse.json(
@@ -73,9 +78,10 @@ export async function PUT(
   const priceStr = formData.get("price") as string;
   const originalPriceStr = formData.get("originalPrice") as string;
   const stockStr = formData.get("stock") as string;
-  const sku = (formData.get("sku") as string)?.trim();
-  const description = (formData.get("description") as string)?.trim();
-  const isFeaturedRaw = formData.get("isFeatured") as string | null;
+  const skuRaw = formData.get("sku") as string | null;
+  const shortDescriptionRaw = formData.get("shortDescription") as string | null;
+  const descriptionRaw = formData.get("description") as string | null;
+  const sectionsRaw = formData.get("sections") as string | null;
   const categorySlug = (formData.get("categorySlug") as string)?.trim();
   const subCategorySlug = (formData.get("subCategorySlug") as string)?.trim() || undefined;
 
@@ -91,15 +97,46 @@ export async function PUT(
     const originalPrice = parseFloat(originalPriceStr);
     updateData.originalPrice = isNaN(originalPrice) ? null : originalPrice;
   }
-  if (stockStr) {
+  if (stockStr !== null) {
     const stock = parseInt(stockStr, 10);
-    if (!isNaN(stock)) updateData.stock = stock;
+    updateData.stock = isNaN(stock) ? 0 : stock;
   }
-  if (sku) updateData.sku = sku;
-  if (description) updateData.description = description;
-  if (isFeaturedRaw !== null) updateData.isFeatured = isFeaturedRaw === "true";
+  if (skuRaw !== null) {
+    const sku = skuRaw.trim();
+    updateData.sku = sku || null;
+  }
+  if (shortDescriptionRaw !== null) {
+    const shortDescription = shortDescriptionRaw.trim();
+    const shortDescriptionWords = countWords(shortDescription);
+    if (shortDescriptionWords === 0) {
+      await deleteProductImages(newlyUploaded.map((i) => i.publicId));
+      return NextResponse.json(
+        { error: "Short description is required" },
+        { status: 400 }
+      );
+    }
+    if (shortDescriptionWords > SHORT_DESCRIPTION_MAX_WORDS) {
+      await deleteProductImages(newlyUploaded.map((i) => i.publicId));
+      return NextResponse.json(
+        { error: `Short description must be ${SHORT_DESCRIPTION_MAX_WORDS} words or fewer` },
+        { status: 400 }
+      );
+    }
+    updateData.shortDescription = shortDescription;
+  }
+  if (descriptionRaw !== null) {
+    const description = descriptionRaw.trim();
+    updateData.description = description ? sanitizeProductHtml(description) : null;
+  }
+  if (sectionsRaw !== null) {
+    try {
+      updateData.sections = sanitizeSections(JSON.parse(sectionsRaw));
+    } catch {
+      updateData.sections = [];
+    }
+  }
   if (newCover) updateData.coverImage = newCover;
-  if (newGalleryFiles.length > 0 || keepPublicIds.length > 0) {
+  if (galleryTouched) {
     updateData.images = [...keptImages, ...newGalleryUploads];
   }
 
@@ -126,7 +163,7 @@ export async function PUT(
     const removedGalleryImages = existing.images.filter(
       (img) => !keepPublicIds.includes(img.publicId)
     );
-    if (newGalleryFiles.length > 0 || keepPublicIds.length > 0) {
+    if (galleryTouched) {
       removedPublicIds.push(...removedGalleryImages.map((i) => i.publicId));
     }
     await deleteProductImages(removedPublicIds);
@@ -144,15 +181,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth.api.getSession({ headers: request.headers });
-  if (!session) {
+  if (!session || (session.user as { role?: string }).role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
 
-  const product = await prisma.product.findFirst({
-    where: { id, userId: session.user.id },
-  });
+  const product = await prisma.product.findFirst({ where: { id } });
   if (!product) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }

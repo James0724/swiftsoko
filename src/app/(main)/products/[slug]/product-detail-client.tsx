@@ -29,6 +29,7 @@ import {
 import type { Product } from "@/lib/map-product";
 import { useCartStore } from "@/store/use-cart-store";
 import { ProductCard } from "@/components/ui/product-card";
+import { RichTextContent } from "@/components/ui/rich-text-content";
 
 export function ProductDetailClient({
   product,
@@ -55,6 +56,12 @@ export function ProductDetailClient({
       addItem(product as any);
     }
     openCart();
+  };
+
+  const handleShare = () => {
+    const url = window.location.href;
+    const text = `Check out ${product.name} on Swiftsoko — KSh ${product.price.toLocaleString()}\n${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   const stockStatus =
@@ -214,10 +221,12 @@ export function ProductDetailClient({
               )}
             </div>
 
-            {/* Description */}
-            <p className="font-bold text-gray-700 leading-relaxed text-sm border-l-4 border-yellow-400 pl-4">
-              {product.description}
-            </p>
+            {/* Short description */}
+            {product.shortDescription && (
+              <p className="font-bold text-gray-700 leading-relaxed text-sm border-l-4 border-yellow-400 pl-4 whitespace-pre-line">
+                {product.shortDescription}
+              </p>
+            )}
 
             {/* Highlights */}
             {product.highlights && product.highlights.length > 0 && (
@@ -349,9 +358,12 @@ export function ProductDetailClient({
             </div>
 
             {/* Share */}
-            <button className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors self-start">
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-gray-400 hover:text-black transition-colors self-start"
+            >
               <Share2 className="w-4 h-4" />
-              Share this product
+              Share via WhatsApp
             </button>
           </div>
         </div>
@@ -366,9 +378,9 @@ export function ProductDetailClient({
                 Description
               </AccordionTrigger>
               <AccordionContent className="px-5 pb-5">
-                <p className="font-bold text-gray-700 leading-relaxed text-sm border-l-4 border-yellow-400 pl-4 mb-4">
-                  {product.description}
-                </p>
+                <div className="font-bold text-gray-700 leading-relaxed text-sm border-l-4 border-yellow-400 pl-4 mb-4">
+                  <RichTextContent html={product.description} />
+                </div>
                 {product.highlights && (
                   <ul className="space-y-2 mt-3">
                     {product.highlights.map((h, i) => (

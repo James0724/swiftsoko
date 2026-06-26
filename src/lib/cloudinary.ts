@@ -22,31 +22,46 @@ cloudinary.config({
 });
 
 const PRODUCT_IMAGES_FOLDER = "products";
+const PRODUCT_CONTENT_IMAGES_FOLDER = "product-content";
 
-export async function uploadProductImage(
+function uploadImageToFolder(
+  file: File,
+  folder: string
+): Promise<{ publicId: string; url: string }> {
+  return file.arrayBuffer().then(
+    (arrayBuffer) =>
+      new Promise((resolve, reject) => {
+        const buffer = Buffer.from(arrayBuffer);
+        cloudinary.uploader
+          .upload_stream(
+            {
+              folder,
+              resource_type: "image",
+              unique_filename: true,
+              overwrite: false,
+            },
+            (error, result) => {
+              if (error || !result) {
+                return reject(error ?? new Error("Cloudinary upload failed"));
+              }
+              resolve({ publicId: result.public_id, url: result.secure_url });
+            }
+          )
+          .end(buffer);
+      })
+  );
+}
+
+export function uploadProductImage(
   file: File
 ): Promise<{ publicId: string; url: string }> {
-  const arrayBuffer = await file.arrayBuffer();
-  const buffer = Buffer.from(arrayBuffer);
+  return uploadImageToFolder(file, PRODUCT_IMAGES_FOLDER);
+}
 
-  return new Promise((resolve, reject) => {
-    cloudinary.uploader
-      .upload_stream(
-        {
-          folder: PRODUCT_IMAGES_FOLDER,
-          resource_type: "image",
-          unique_filename: true,
-          overwrite: false,
-        },
-        (error, result) => {
-          if (error || !result) {
-            return reject(error ?? new Error("Cloudinary upload failed"));
-          }
-          resolve({ publicId: result.public_id, url: result.secure_url });
-        }
-      )
-      .end(buffer);
-  });
+export function uploadContentImage(
+  file: File
+): Promise<{ publicId: string; url: string }> {
+  return uploadImageToFolder(file, PRODUCT_CONTENT_IMAGES_FOLDER);
 }
 
 export async function deleteProductImage(publicId: string): Promise<void> {
