@@ -1,6 +1,9 @@
 export interface Subcategory {
   name: string;
   slug: string;
+  // Optional further nesting: if a subcategory has its own subcategories,
+  // the category picker will keep drilling down within the same control.
+  subcategories?: Subcategory[];
 }
 
 export interface Category {

@@ -1,27 +1,22 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LayoutDashboard, Briefcase, ShoppingCart, Settings,
   PackageSearch, Pencil, Trash2,
   Star, MessageSquare, Eye, Check,
   X, AlertCircle, Clock, Package, RefreshCcw,
-  Search, DollarSign, Upload, Loader2,
+  Search, DollarSign, Upload, Loader2, Tag, Globe, MapPin,
+  Calendar, Power, ImagePlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AddProductModal } from "../modals/product-form-modal";
-import { CATEGORIES } from "@/lib/data/categories";
 import { PRODUCT_SECTIONS } from "@/lib/product-sections";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { CategoryCascadeSelect } from "@/components/ui/category-cascade-select";
+import { BrandAutocomplete, type BrandOption } from "@/components/ui/brand-autocomplete";
 import { countWords, SHORT_DESCRIPTION_MAX_WORDS } from "@/lib/sanitize-html";
 import type { AdminProduct } from "@/lib/map-product";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const MAX_GALLERY_IMAGES = 4;
 
@@ -107,6 +102,7 @@ const ProductDashboard = ({ initialProducts }: { initialProducts: AdminProduct[]
           onCreated={(p: AdminProduct) => setProducts((prev) => [p, ...prev])}
         />
       );
+      case "Brands":    return <BrandsSection />;
       case "Orders":    return <OrdersSection orders={filteredOrders} search={orderSearch} onSearch={setOrderSearch} statusFilter={orderStatusFilter} onStatusFilter={setOrderStatusFilter} />;
       case "Reviews":   return <ReviewsSection reviews={filteredReviews} statusFilter={reviewStatusFilter} onStatusFilter={setReviewStatusFilter} onUpdateStatus={(id: string, status: string) => setReviews((prev) => prev.map((r) => r.id === id ? { ...r, status } : r))} />;
       default: return null;
@@ -125,6 +121,7 @@ const ProductDashboard = ({ initialProducts }: { initialProducts: AdminProduct[]
           {[
             { label: "Dashboard", icon: <LayoutDashboard size={22} strokeWidth={3} />, color: "bg-cyan-300" },
             { label: "Products",  icon: <Briefcase size={22} strokeWidth={3} />,       color: "bg-lime-400" },
+            { label: "Brands",    icon: <Tag size={22} strokeWidth={3} />,             color: "bg-orange-300" },
             { label: "Orders",    icon: <ShoppingCart size={22} strokeWidth={3} />,    color: "bg-yellow-400" },
             { label: "Reviews",   icon: <MessageSquare size={22} strokeWidth={3} />,   color: "bg-purple-400" },
           ].map(({ label, icon, color }) => (
@@ -500,13 +497,22 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
     sections: product.sections ?? [],
     categorySlug: product.categorySlug,
     subCategorySlug: product.subCategorySlug,
+    brandId: product.brandId ?? "",
   });
+  const [brands, setBrands] = useState<BrandOption[]>([]);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [keptGallery, setKeptGallery] = useState(product.galleryImages);
   const [newGalleryFiles, setNewGalleryFiles] = useState<File[]>([]);
   const [newGalleryPreviews, setNewGalleryPreviews] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/brands")
+      .then((r) => r.json())
+      .then((d) => setBrands(d.brands ?? []))
+      .catch(() => {});
+  }, []);
 
   const shortDescriptionWords = countWords(form.shortDescription ?? "");
   const shortDescriptionError =
@@ -516,10 +522,6 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
       ? `Short description must be ${SHORT_DESCRIPTION_MAX_WORDS} words or fewer`
       : null;
 
-  const subcategories = useMemo(
-    () => CATEGORIES.find((c) => c.slug === form.categorySlug)?.subcategories ?? [],
-    [form.categorySlug]
-  );
   const gallerySlotsLeft = MAX_GALLERY_IMAGES - keptGallery.length - newGalleryFiles.length;
 
   const handleChange = (field: keyof typeof form, value: any) => {
@@ -568,6 +570,7 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
       formData.append("sections", JSON.stringify(form.sections ?? []));
       if (form.categorySlug) formData.append("categorySlug", form.categorySlug);
       if (form.subCategorySlug) formData.append("subCategorySlug", form.subCategorySlug);
+      if (form.brandId) formData.append("brandId", form.brandId);
       if (coverFile) formData.append("cover", coverFile);
       formData.append("galleryTouched", "1");
       keptGallery.forEach((img) => formData.append("keepImage", img.publicId));
@@ -610,47 +613,24 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
             </div>
           ))}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="font-black uppercase text-xs">Category</label>
-              <Select
-                value={form.categorySlug}
-                onValueChange={(v) => {
-                  handleChange("categorySlug", v);
-                  handleChange("subCategorySlug", "");
-                }}
-              >
-                <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat.slug} value={cat.slug}>
-                      {cat.icon} {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="font-black uppercase text-xs">Subcategory</label>
-              <Select
-                value={form.subCategorySlug}
-                onValueChange={(v) => handleChange("subCategorySlug", v)}
-                disabled={subcategories.length === 0}
-              >
-                <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
-                  <SelectValue placeholder="Optional" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subcategories.map((sub) => (
-                    <SelectItem key={sub.slug} value={sub.slug}>
-                      {sub.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-1">
+            <label className="font-black uppercase text-xs">Category</label>
+            <CategoryCascadeSelect
+              value={{ categorySlug: form.categorySlug, subCategorySlug: form.subCategorySlug }}
+              onChange={({ categorySlug, subCategorySlug }) => {
+                handleChange("categorySlug", categorySlug);
+                handleChange("subCategorySlug", subCategorySlug ?? "");
+              }}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="font-black uppercase text-xs">Brand <span className="text-red-500">*</span></label>
+            <BrandAutocomplete
+              brands={brands}
+              value={form.brandId}
+              onChange={(id) => handleChange("brandId", id)}
+            />
           </div>
 
           <div className="space-y-1">
@@ -763,6 +743,377 @@ const EditProductModal = ({ product, onClose, onSave }: { product: AdminProduct;
           >
             {submitting && <Loader2 size={16} className="animate-spin" />}
             {submitting ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Brands Section ───────────────────────────────────────────────────────────
+interface BrandRecord {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  website: string | null;
+  country: string | null;
+  foundedYear: number | null;
+  isActive: boolean;
+  logo: { url: string; publicId: string } | null;
+  createdAt: string;
+}
+
+const EMPTY_BRAND_FORM = {
+  name: "",
+  description: "",
+  website: "",
+  country: "",
+  foundedYear: "",
+  isActive: true,
+};
+
+const BrandsSection = () => {
+  const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingBrand, setEditingBrand] = useState<BrandRecord | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/brands")
+      .then((r) => r.json())
+      .then((d) => setBrands(d.brands ?? []))
+      .catch(() => toast.error("Failed to load brands"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    setDeleting(id);
+    try {
+      const res = await fetch(`/api/brands/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) { toast.error(json.error ?? "Failed to delete brand"); return; }
+      setBrands((prev) => prev.filter((b) => b.id !== id));
+      toast.success("Brand deleted");
+    } catch {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setDeleting(null);
+      setDeleteConfirm(null);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-4xl font-black uppercase italic tracking-tighter">Brands</h1>
+          <p className="font-bold text-sm text-gray-500 uppercase">{brands.length} total brands</p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="bg-black text-white px-8 py-4 font-black uppercase border-2 border-black hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all"
+        >
+          Add New Brand
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 size={36} className="animate-spin" />
+        </div>
+      ) : brands.length === 0 ? (
+        <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-16 text-center">
+          <Tag size={60} strokeWidth={3} className="mx-auto mb-4 opacity-30" />
+          <p className="font-black uppercase text-xl">No brands yet</p>
+          <p className="font-bold text-sm text-gray-400 uppercase mt-1">Add your first brand to get started</p>
+        </div>
+      ) : (
+        <div className="bg-white border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-indigo-950 text-white text-left">
+                  {["Brand", "Country", "Founded", "Website", "Status", "Actions"].map((h) => (
+                    <th key={h} className="px-5 py-4 font-black uppercase text-[10px] tracking-widest border-r border-indigo-800 last:border-0">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y-2 divide-black">
+                {brands.map((brand) => (
+                  <tr key={brand.id} className="hover:bg-yellow-50 transition-colors">
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        {brand.logo ? (
+                          <div className="w-10 h-10 border-2 border-black shrink-0 overflow-hidden bg-gray-50">
+                            <img src={brand.logo.url} alt={brand.name} className="w-full h-full object-contain p-1" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 border-2 border-black shrink-0 bg-orange-100 flex items-center justify-center">
+                            <Tag size={16} strokeWidth={3} className="text-orange-600" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-black text-sm">{brand.name}</p>
+                          {brand.description && (
+                            <p className="text-xs text-gray-400 font-bold truncate max-w-48">{brand.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 font-bold text-xs text-gray-500 uppercase">{brand.country || "—"}</td>
+                    <td className="px-5 py-3 font-bold text-xs text-gray-500">{brand.foundedYear || "—"}</td>
+                    <td className="px-5 py-3 font-bold text-xs">
+                      {brand.website ? (
+                        <a href={brand.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline truncate max-w-32 block">
+                          {brand.website.replace(/^https?:\/\//, "")}
+                        </a>
+                      ) : "—"}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className={`px-2 py-1 border-2 border-black font-black text-[10px] uppercase ${brand.isActive ? "bg-green-200" : "bg-gray-200"}`}>
+                        {brand.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      {deleteConfirm === brand.id ? (
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => handleDelete(brand.id)} disabled={deleting === brand.id} className="bg-red-500 text-white px-3 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-red-700 disabled:opacity-50 flex items-center gap-1">
+                            {deleting === brand.id && <Loader2 size={12} className="animate-spin" />}
+                            Confirm
+                          </button>
+                          <button onClick={() => setDeleteConfirm(null)} disabled={deleting === brand.id} className="bg-white px-3 py-1.5 border-2 border-black font-black text-xs uppercase hover:bg-gray-100 disabled:opacity-50">Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button onClick={() => setEditingBrand(brand)} className="p-2 border-2 border-black hover:bg-cyan-300 transition-colors"><Pencil size={14} strokeWidth={3} /></button>
+                          <button onClick={() => setDeleteConfirm(brand.id)} className="p-2 border-2 border-black hover:bg-red-300 transition-colors"><Trash2 size={14} strokeWidth={3} /></button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {showAddModal && (
+        <BrandFormModal
+          onClose={() => setShowAddModal(false)}
+          onSave={(b) => { setBrands((prev) => [b, ...prev]); setShowAddModal(false); }}
+        />
+      )}
+      {editingBrand && (
+        <BrandFormModal
+          brand={editingBrand}
+          onClose={() => setEditingBrand(null)}
+          onSave={(b) => { setBrands((prev) => prev.map((x) => x.id === b.id ? b : x)); setEditingBrand(null); }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── Brand Form Modal ─────────────────────────────────────────────────────────
+const BrandFormModal = ({
+  brand,
+  onClose,
+  onSave,
+}: {
+  brand?: BrandRecord;
+  onClose: () => void;
+  onSave: (b: BrandRecord) => void;
+}) => {
+  const isEdit = !!brand;
+  const [form, setForm] = useState({
+    name: brand?.name ?? "",
+    description: brand?.description ?? "",
+    website: brand?.website ?? "",
+    country: brand?.country ?? "",
+    foundedYear: brand?.foundedYear ? String(brand.foundedYear) : "",
+    isActive: brand?.isActive ?? true,
+  });
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(brand?.logo?.url ?? null);
+  const [removeLogo, setRemoveLogo] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [nameError, setNameError] = useState("");
+
+  const handleChange = (field: keyof typeof form, value: any) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+    setRemoveLogo(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!form.name.trim()) { setNameError("Brand name is required"); return; }
+    setNameError("");
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append("name", form.name.trim());
+      formData.append("description", form.description ?? "");
+      formData.append("website", form.website ?? "");
+      formData.append("country", form.country ?? "");
+      formData.append("foundedYear", form.foundedYear ?? "");
+      formData.append("isActive", String(form.isActive));
+      if (logoFile) formData.append("logo", logoFile);
+      if (isEdit && removeLogo) formData.append("removeLogo", "true");
+
+      const url = isEdit ? `/api/brands/${brand.id}` : "/api/brands";
+      const method = isEdit ? "PUT" : "POST";
+      const res = await fetch(url, { method, body: formData });
+      const json = await res.json();
+
+      if (!res.ok) { toast.error(json.error ?? "Failed to save brand"); return; }
+      toast.success(isEdit ? "Brand updated" : "Brand created");
+      onSave(json.brand as BrandRecord);
+    } catch {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] w-full max-w-lg max-h-[90vh] overflow-auto">
+        <div className="bg-orange-300 border-b-4 border-black px-8 py-5 flex items-center justify-between sticky top-0">
+          <h2 className="text-2xl font-black uppercase italic tracking-tighter">
+            {isEdit ? "Edit Brand" : "New Brand"}
+          </h2>
+          <button onClick={onClose} className="p-2 border-2 border-black hover:bg-black hover:text-white transition-colors">
+            <X size={18} strokeWidth={3} />
+          </button>
+        </div>
+
+        <div className="p-8 space-y-5">
+          {/* Logo */}
+          <div className="space-y-2">
+            <label className="font-black uppercase text-xs">Brand Logo</label>
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 border-4 border-black bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                {logoPreview && !removeLogo ? (
+                  <img src={logoPreview} alt="logo" className="w-full h-full object-contain p-1" />
+                ) : (
+                  <ImagePlus size={28} className="text-gray-300" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer border-4 border-dashed border-black px-4 py-2 hover:bg-cyan-50 transition-colors font-bold text-xs uppercase">
+                  <Upload size={14} strokeWidth={3} />
+                  {logoFile ? "Change Logo" : isEdit && brand?.logo ? "Replace Logo" : "Upload Logo"}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                </label>
+                {(logoPreview || brand?.logo) && !removeLogo && (
+                  <button
+                    type="button"
+                    onClick={() => { setLogoFile(null); setLogoPreview(null); setRemoveLogo(true); }}
+                    className="text-xs font-black text-red-500 uppercase hover:underline text-left"
+                  >
+                    Remove Logo
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Name */}
+          <div className="space-y-1">
+            <label className="font-black uppercase text-xs">Brand Name <span className="text-red-500">*</span></label>
+            <input
+              value={form.name}
+              onChange={(e) => handleChange("name", e.target.value)}
+              className="w-full h-12 px-4 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50"
+              placeholder="e.g. Nike, Samsung, Safaricom"
+            />
+            {nameError && <p className="text-red-600 font-bold text-[10px] italic">{nameError}</p>}
+          </div>
+
+          {/* Description */}
+          <div className="space-y-1">
+            <label className="font-black uppercase text-xs">Description</label>
+            <textarea
+              value={form.description ?? ""}
+              onChange={(e) => handleChange("description", e.target.value)}
+              className="w-full min-h-16 px-4 py-3 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50 resize-none"
+              placeholder="Short brand description..."
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            {/* Country */}
+            <div className="space-y-1">
+              <label className="font-black uppercase text-xs flex items-center gap-1"><MapPin size={10} /> Country</label>
+              <input
+                value={form.country ?? ""}
+                onChange={(e) => handleChange("country", e.target.value)}
+                className="w-full h-12 px-4 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50"
+                placeholder="e.g. Kenya"
+              />
+            </div>
+            {/* Founded Year */}
+            <div className="space-y-1">
+              <label className="font-black uppercase text-xs flex items-center gap-1"><Calendar size={10} /> Founded Year</label>
+              <input
+                type="number"
+                value={form.foundedYear ?? ""}
+                onChange={(e) => handleChange("foundedYear", e.target.value)}
+                className="w-full h-12 px-4 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50"
+                placeholder="e.g. 1990"
+              />
+            </div>
+          </div>
+
+          {/* Website */}
+          <div className="space-y-1">
+            <label className="font-black uppercase text-xs flex items-center gap-1"><Globe size={10} /> Website</label>
+            <input
+              value={form.website ?? ""}
+              onChange={(e) => handleChange("website", e.target.value)}
+              className="w-full h-12 px-4 border-4 border-black font-bold text-sm focus:outline-none focus:bg-yellow-50"
+              placeholder="https://brand.com"
+            />
+          </div>
+
+          {/* Active Status */}
+          <div className="flex items-center gap-3 p-4 border-4 border-black">
+            <Power size={18} strokeWidth={3} className={form.isActive ? "text-green-600" : "text-gray-400"} />
+            <div className="flex-1">
+              <p className="font-black uppercase text-xs">Brand Status</p>
+              <p className="text-xs font-bold text-gray-500">{form.isActive ? "Active — visible in filters and product forms" : "Inactive — hidden from selection"}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleChange("isActive", !form.isActive)}
+              className={`px-4 py-2 border-2 border-black font-black text-xs uppercase transition-colors ${form.isActive ? "bg-green-300 hover:bg-green-400" : "bg-gray-200 hover:bg-gray-300"}`}
+            >
+              {form.isActive ? "Active" : "Inactive"}
+            </button>
+          </div>
+        </div>
+
+        <div className="px-8 py-5 border-t-4 border-black bg-gray-50 flex justify-end gap-3">
+          <button onClick={onClose} disabled={submitting} className="px-6 py-3 border-4 border-black font-black uppercase text-sm hover:bg-gray-200 transition-colors disabled:opacity-50">
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="px-8 py-3 bg-orange-300 border-4 border-black font-black uppercase text-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-none transition-all disabled:opacity-50 flex items-center gap-2"
+          >
+            {submitting && <Loader2 size={16} className="animate-spin" />}
+            {submitting ? "Saving..." : isEdit ? "Save Changes" : "Create Brand"}
           </button>
         </div>
       </div>

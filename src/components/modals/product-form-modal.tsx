@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -19,14 +19,8 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { CATEGORIES } from "@/lib/data/categories";
+import { CategoryCascadeSelect } from "@/components/ui/category-cascade-select";
+import { BrandAutocomplete, type BrandOption } from "@/components/ui/brand-autocomplete";
 import { PRODUCT_SECTIONS } from "@/lib/product-sections";
 import { countWords, SHORT_DESCRIPTION_MAX_WORDS } from "@/lib/sanitize-html";
 import type { AdminProduct } from "@/lib/map-product";
@@ -40,6 +34,7 @@ const productSchema = z.object({
   stock: z.coerce.number().min(0, "Stock cannot be negative"),
   categorySlug: z.string().min(1, "Category is required"),
   subCategorySlug: z.string().optional(),
+  brandId: z.string().min(1, "Brand is required"),
   shortDescription: z
     .string()
     .trim()
@@ -66,6 +61,15 @@ export function AddProductModal({
   const [galleryPreviews, setGalleryPreviews] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [brands, setBrands] = useState<BrandOption[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    fetch("/api/brands")
+      .then((r) => r.json())
+      .then((d) => setBrands(d.brands ?? []))
+      .catch(() => {});
+  }, [open]);
 
   const {
     register,
@@ -82,18 +86,13 @@ export function AddProductModal({
       stock: 0,
       categorySlug: "",
       subCategorySlug: "",
+      brandId: "",
       sku: "",
       shortDescription: "",
       description: "",
       sections: [],
     },
   });
-
-  const selectedCategorySlug = watch("categorySlug");
-  const subcategories = useMemo(
-    () => CATEGORIES.find((c) => c.slug === selectedCategorySlug)?.subcategories ?? [],
-    [selectedCategorySlug]
-  );
 
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,6 +140,7 @@ export function AddProductModal({
       formData.append("description", data.description);
       formData.append("categorySlug", data.categorySlug);
       if (data.subCategorySlug) formData.append("subCategorySlug", data.subCategorySlug);
+      formData.append("brandId", data.brandId);
       formData.append("sections", JSON.stringify(data.sections ?? []));
       formData.append("cover", coverFile);
       galleryFiles.forEach((file) => formData.append("images", file));
@@ -280,56 +280,33 @@ export function AddProductModal({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="font-black uppercase text-sm">
-                        Category
-                      </Label>
-                      <Select
-                        value={selectedCategorySlug}
-                        onValueChange={(v) => {
-                          setValue("categorySlug", v);
-                          setValue("subCategorySlug", "");
-                        }}
-                      >
-                        <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATEGORIES.map((cat) => (
-                            <SelectItem key={cat.slug} value={cat.slug}>
-                              {cat.icon} {cat.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {errors.categorySlug && (
-                        <p className="text-red-600 font-bold text-[10px] italic">
-                          {errors.categorySlug.message}
-                        </p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="font-black uppercase text-sm">
-                        Subcategory
-                      </Label>
-                      <Select
-                        value={watch("subCategorySlug")}
-                        onValueChange={(v) => setValue("subCategorySlug", v)}
-                        disabled={subcategories.length === 0}
-                      >
-                        <SelectTrigger className="h-12 w-full rounded-none border-4 border-black font-bold focus-visible:ring-0">
-                          <SelectValue placeholder="Optional" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {subcategories.map((sub) => (
-                            <SelectItem key={sub.slug} value={sub.slug}>
-                              {sub.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-2">
+                    <Label className="font-black uppercase text-sm">
+                      Brand <span className="text-red-500">*</span>
+                    </Label>
+                    <BrandAutocomplete
+                      brands={brands}
+                      value={watch("brandId")}
+                      onChange={(id) => setValue("brandId", id, { shouldValidate: true })}
+                      error={errors.brandId?.message}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-black uppercase text-sm">
+                      Category
+                    </Label>
+                    <CategoryCascadeSelect
+                      value={{
+                        categorySlug: watch("categorySlug"),
+                        subCategorySlug: watch("subCategorySlug"),
+                      }}
+                      onChange={({ categorySlug, subCategorySlug }) => {
+                        setValue("categorySlug", categorySlug);
+                        setValue("subCategorySlug", subCategorySlug ?? "");
+                      }}
+                      error={errors.categorySlug?.message}
+                    />
                   </div>
 
                   <div className="space-y-2">

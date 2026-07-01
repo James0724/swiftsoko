@@ -14,7 +14,7 @@ export default async function DashboardPage() {
 
   const products = await prisma.product.findMany({
     orderBy: { createdAt: "desc" },
-    include: { category: true, subCategory: true },
+    include: { category: true, subCategory: true, brand: true },
   });
 
   return <ProductDashboard initialProducts={products.map(mapAdminProduct)} />;

@@ -24,3 +24,20 @@ export async function generateUniqueSlug(name: string, excludeId?: string): Prom
 
   return slug;
 }
+
+export async function generateUniqueBrandSlug(name: string, excludeId?: string): Promise<string> {
+  const base = slugify(name) || "brand";
+  let slug = base;
+  let suffix = 2;
+
+  while (
+    await prisma.brand.findFirst({
+      where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    })
+  ) {
+    slug = `${base}-${suffix}`;
+    suffix += 1;
+  }
+
+  return slug;
+}

@@ -79,6 +79,28 @@ type ProductImage {
   publicId String
 }
 
+type BrandLogo {
+  url      String
+  publicId String
+}
+
+model Brand {
+  id          String      @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  slug        String      @unique
+  logo        BrandLogo?
+  description String?
+  website     String?
+  country     String?
+  foundedYear Int?
+  isActive    Boolean     @default(true)
+  products    Product[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("brand")
+}
+
 model Product {
   id            String         @id @default(auto()) @map("_id") @db.ObjectId
   name             String
@@ -97,6 +119,10 @@ model Product {
   accountId   String
   account     Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
   
+  // Brand (optional for legacy products, required via form validation for new ones)
+  brandId       String?   @db.ObjectId
+  brand         Brand?    @relation(fields: [brandId], references: [id])
+
   // Main Category (Required)
   categoryId    String   @db.ObjectId
   category      Category @relation("MainCategory", fields: [categoryId], references: [id])

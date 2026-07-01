@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Plus,
   Minus,
@@ -82,7 +83,7 @@ export function ProductDetailClient({
           <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
           <Link href="/products" className="hover:text-indigo-600 transition-colors">Products</Link>
           <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
-          <Link href={`/products?category=${product.categorySlug}`} className="hover:text-indigo-600 transition-colors">
+          <Link href={`/products/category/${product.categorySlug}`} className="hover:text-indigo-600 transition-colors">
             {product.category}
           </Link>
           <ChevronRight className="w-3 h-3 text-gray-400 shrink-0" />
@@ -117,10 +118,13 @@ export function ProductDetailClient({
                   -{discount}% OFF
                 </Badge>
               )}
-              <img
+              <Image
                 src={product.images[activeImage]}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                alt={product.name}
+                fill
+                priority
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                alt={`${product.name} – ${product.category} | Swiftsoko`}
               />
             </div>
 
@@ -131,13 +135,19 @@ export function ProductDetailClient({
                   <button
                     key={i}
                     onClick={() => setActiveImage(i)}
-                    className={`border-2 aspect-square overflow-hidden transition-all ${
+                    className={`relative border-2 aspect-square overflow-hidden transition-all ${
                       activeImage === i
                         ? "border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] -translate-x-px -translate-y-px"
                         : "border-gray-200 hover:border-black opacity-60 hover:opacity-100"
                     }`}
                   >
-                    <img src={img} className="w-full h-full object-cover" alt={`View ${i + 1}`} />
+                    <Image
+                      src={img}
+                      fill
+                      sizes="120px"
+                      className="object-cover"
+                      alt={`${product.name} view ${i + 1}`}
+                    />
                   </button>
                 ))}
               </div>
@@ -162,7 +172,7 @@ export function ProductDetailClient({
             {/* Category chips */}
             <div className="flex items-center gap-2 flex-wrap">
               <Link
-                href={`/products?category=${product.categorySlug}`}
+                href={`/products/category/${product.categorySlug}`}
                 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 border-2 border-indigo-200 bg-indigo-50 px-2 py-1 hover:bg-indigo-100 hover:border-indigo-400 transition-colors"
               >
                 {product.category}
@@ -494,7 +504,7 @@ export function ProductDetailClient({
                 </h2>
               </div>
               <Link
-                href={`/products?category=${product.categorySlug}`}
+                href={`/products/category/${product.categorySlug}`}
                 className="inline-flex items-center gap-1 font-bold uppercase text-xs tracking-widest hover:underline decoration-2 decoration-yellow-400"
               >
                 View All <Package className="w-3 h-3" />

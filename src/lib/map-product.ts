@@ -1,4 +1,4 @@
-import type { Product as PrismaProduct, Category } from "@/generated/prisma/client";
+import type { Product as PrismaProduct, Category, Brand } from "@/generated/prisma/client";
 
 export interface Product {
   id: string;
@@ -21,7 +21,7 @@ export interface Product {
   description: string;
   stock: number;
   sku: string;
-  brand?: string;
+  brand: string;
   sizes?: string[];
   tags?: string[];
   specs?: Record<string, string>;
@@ -31,6 +31,7 @@ export interface Product {
 export type ProductWithRelations = PrismaProduct & {
   category: Category;
   subCategory: Category | null;
+  brand: Brand | null;
 };
 
 const NEW_THRESHOLD_MS = 14 * 24 * 60 * 60 * 1000;
@@ -62,6 +63,7 @@ export function mapProduct(product: ProductWithRelations): Product {
     description: product.description ?? "",
     stock: product.stock,
     sku: product.sku ?? "",
+    brand: product.brand?.name ?? "",
   };
 }
 
@@ -71,6 +73,7 @@ export function mapProduct(product: ProductWithRelations): Product {
 export interface AdminProduct extends Product {
   coverImagePublicId: string;
   galleryImages: { url: string; publicId: string }[];
+  brandId: string;
 }
 
 export function mapAdminProduct(product: ProductWithRelations): AdminProduct {
@@ -78,5 +81,6 @@ export function mapAdminProduct(product: ProductWithRelations): AdminProduct {
     ...mapProduct(product),
     coverImagePublicId: product.coverImage.publicId,
     galleryImages: product.images.map((i) => ({ url: i.url, publicId: i.publicId })),
+    brandId: product.brandId ?? "",
   };
 }

@@ -42,7 +42,7 @@ const CATEGORY_IMAGES: Record<string, string> = {
 
 export default async function Home() {
   const rows = await prisma.product.findMany({
-    include: { category: true, subCategory: true },
+    include: { category: true, subCategory: true, brand: true },
     orderBy: { createdAt: "desc" },
   });
   const allProducts = rows.map(mapProduct);
@@ -219,22 +219,16 @@ export default async function Home() {
 
       {/* CATEGORY SHOWCASE */}
       <section className="max-w-7xl mx-auto px-4 py-12">
-        <div className="flex justify-between items-end mb-6 border-b-4 border-black pb-2">
+        <div className="mb-6 border-b-4 border-black pb-2">
           <h2 className="text-2xl lg:text-4xl font-black uppercase italic tracking-tighter">
             Shop by Category
           </h2>
-          <Link
-            href="/products"
-            className="font-bold uppercase text-sm flex items-center gap-2 hover:underline decoration-2 decoration-yellow-400"
-          >
-            All Categories <ArrowUpRight className="w-4 h-4" />
-          </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          {CATEGORIES.slice(0, 8).map((cat) => (
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+          {CATEGORIES.map((cat) => (
             <Link
               key={cat.slug}
-              href={`/products?category=${cat.slug}`}
+              href={`/products/category/${cat.slug}`}
               className="group flex flex-col items-center gap-2 border-2 border-black p-3 hover:bg-yellow-300 hover:border-yellow-400 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-0.5 hover:-translate-y-0.5 transition-all text-center"
             >
               <span className="text-3xl">{cat.icon}</span>
@@ -384,7 +378,7 @@ export default async function Home() {
                 <img
                   src={CATEGORY_IMAGES["sports-fitness"]}
                   alt="Sports & Fitness"
-                  className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-cover opacity-80 transition-transform duration-500"
                 />
                 <div className="absolute inset-0 bg-gradient-to-l from-transparent to-orange-500" />
               </div>

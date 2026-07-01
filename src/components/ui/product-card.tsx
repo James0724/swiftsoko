@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/store/use-cart-store";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import Image from "next/image";
 import type { Product } from "@/lib/map-product";
 
 export function ProductCard({ product }: { product: Product }) {
@@ -26,10 +27,12 @@ export function ProductCard({ product }: { product: Product }) {
               -{discount}%
             </Badge>
           )}
-          <img
+          <Image
             src={image}
-            alt={name}
-            className="w-full h-full object-cover transition-all duration-500 scale-105 group-hover:scale-100"
+            alt={`${name} – ${category} | Swiftsoko`}
+            fill
+            sizes="(min-width: 1280px) 23vw, (min-width: 640px) 45vw, 90vw"
+            className="object-cover transition-all duration-500 scale-105 group-hover:scale-100"
           />
         </div>
       </Link>

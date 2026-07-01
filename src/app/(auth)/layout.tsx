@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Swiftsoko — Account",
   description: "Sign in or create your Swiftsoko account.",
+  robots: { index: false, follow: false },
 };
 
 export default function AuthLayout({

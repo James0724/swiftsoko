@@ -1,0 +1,14 @@
+# Swiftsoko
+
+Swiftsoko is an online marketplace serving Nairobi and the wider Kenyan market, selling electronics, fashion, health & beauty, home & living, sports & fitness, groceries, baby & kids products, automotive parts, books & stationery, and industrial & business supplies. Customers in Nairobi typically receive deliveries within 1–3 business days; upcountry delivery takes 3–7 days.
+
+## Key pages
+- Homepage: https://swiftsoko.co.ke/
+- All products: https://swiftsoko.co.ke/products
+- Category pages: https://swiftsoko.co.ke/products/category/{category-slug}
+- Individual products: https://swiftsoko.co.ke/products/{product-slug}
+- Full sitemap: https://swiftsoko.co.ke/sitemap.xml
+
+## Notes for AI agents and crawlers
+- Product and category pages are server-rendered with Product/CollectionPage/BreadcrumbList JSON-LD structured data.
+- Prices are listed in Kenyan Shillings (KSh / KES).

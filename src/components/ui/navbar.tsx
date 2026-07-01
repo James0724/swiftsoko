@@ -634,7 +634,7 @@ export function Navbar() {
                       {cat.name}
                     </a>
                     <ul className="space-y-1.5">
-                      {cat.subcategories.slice(0, 4).map((sub) => (
+                      {cat.subcategories.map((sub) => (
                         <li key={sub.slug}>
                           <a
                             href={`/shop?category=${cat.slug}&sub=${sub.slug}`}
@@ -645,17 +645,6 @@ export function Navbar() {
                           </a>
                         </li>
                       ))}
-                      {cat.subcategories.length > 4 && (
-                        <li>
-                          <a
-                            href={`/shop?category=${cat.slug}`}
-                            onClick={() => setIsMegaOpen(false)}
-                            className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:underline decoration-2 underline-offset-2"
-                          >
-                            View all →
-                          </a>
-                        </li>
-                      )}
                     </ul>
                   </div>
                 ))}

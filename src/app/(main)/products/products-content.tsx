@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   SlidersHorizontal,
@@ -29,9 +29,19 @@ const SORT_OPTIONS = [
   { label: "Most Reviews", value: "reviews" },
 ];
 
-export function ProductsContent({ products }: { products: Product[] }) {
+export function ProductsContent({
+  products,
+  defaultCategorySlug,
+  defaultSubCategorySlug,
+}: {
+  products: Product[];
+  /** Pre-selects a category, for category-scoped pages where `products` is already filtered server-side. */
+  defaultCategorySlug?: string;
+  defaultSubCategorySlug?: string;
+}) {
   const searchParams = useSearchParams();
-  const initialCategory = searchParams.get("category") ?? "";
+  const initialCategory = defaultCategorySlug ?? searchParams.get("category") ?? "";
+  const initialSearch = searchParams.get("search") ?? "";
 
   const maxPrice = useMemo(
     () => Math.max(500, ...products.map((p) => p.price)),
@@ -39,16 +49,27 @@ export function ProductsContent({ products }: { products: Product[] }) {
   );
 
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState(
+    defaultSubCategorySlug ?? ""
+  );
+  const [selectedBrand, setSelectedBrand] = useState("");
   const [priceRange, setPriceRange] = useState([0, maxPrice]);
   const [minRating, setMinRating] = useState(0);
   const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [inStockOnly, setInStockOnly] = useState(false);
   const [sortBy, setSortBy] = useState("newest");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [currentPage, setCurrentPage] = useState(1);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([initialCategory]);
+  const [allBrands, setAllBrands] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/brands")
+      .then((r) => r.json())
+      .then((d) => setAllBrands((d.brands ?? []).filter((b: any) => b.isActive)))
+      .catch(() => {});
+  }, []);
 
   const toggleCategory = useCallback((slug: string) => {
     setExpandedCategories((prev) =>
@@ -70,6 +91,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
   const clearAllFilters = () => {
     setSelectedCategory("");
     setSelectedSubcategory("");
+    setSelectedBrand("");
     setPriceRange([0, maxPrice]);
     setMinRating(0);
     setOnSaleOnly(false);
@@ -103,6 +125,9 @@ export function ProductsContent({ products }: { products: Product[] }) {
     if (minRating > 0) {
       result = result.filter((p) => p.rating >= minRating);
     }
+    if (selectedBrand) {
+      result = result.filter((p) => p.brand === selectedBrand);
+    }
     if (onSaleOnly) {
       result = result.filter((p) => p.isOnSale);
     }
@@ -133,6 +158,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
     searchQuery,
     selectedCategory,
     selectedSubcategory,
+    selectedBrand,
     priceRange,
     minRating,
     onSaleOnly,
@@ -149,6 +175,7 @@ export function ProductsContent({ products }: { products: Product[] }) {
   const activeFilterCount = [
     selectedCategory,
     selectedSubcategory,
+    selectedBrand,
     priceRange[0] > 0 || priceRange[1] < maxPrice,
     minRating > 0,
     onSaleOnly,
@@ -248,6 +275,41 @@ export function ProductsContent({ products }: { products: Product[] }) {
           })}
         </div>
       </div>
+
+      {allBrands.length > 0 && (
+        <div>
+          <p className="font-black uppercase text-xs tracking-widest mb-3 border-b-2 border-black pb-2">
+            Brand
+          </p>
+          <div className="space-y-1">
+            <button
+              onClick={() => { setSelectedBrand(""); setCurrentPage(1); }}
+              className={`w-full text-left px-3 py-2 text-sm font-bold transition-colors ${
+                !selectedBrand ? "bg-black text-white" : "hover:bg-yellow-100"
+              }`}
+            >
+              All Brands
+            </button>
+            {allBrands.map((brand) => {
+              const count = products.filter((p) => p.brand === brand.name).length;
+              return (
+                <button
+                  key={brand.id}
+                  onClick={() => { setSelectedBrand(brand.name === selectedBrand ? "" : brand.name); setCurrentPage(1); }}
+                  className={`w-full text-left px-3 py-2 text-sm font-bold transition-colors flex justify-between items-center ${
+                    selectedBrand === brand.name ? "bg-orange-400 text-black" : "hover:bg-yellow-100"
+                  }`}
+                >
+                  <span>{brand.name}</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-black ${selectedBrand === brand.name ? "bg-white/30" : "bg-gray-100"}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="font-black uppercase text-xs tracking-widest mb-3 border-b-2 border-black pb-2">
@@ -378,6 +440,15 @@ export function ProductsContent({ products }: { products: Product[] }) {
                 className="rounded-none border-2 border-black bg-yellow-200 text-black font-bold cursor-pointer hover:bg-red-100 flex items-center gap-1"
               >
                 {activeCategoryData.subcategories.find((s) => s.slug === selectedSubcategory)?.name}
+                <X className="w-3 h-3 ml-1" />
+              </Badge>
+            )}
+            {selectedBrand && (
+              <Badge
+                onClick={() => setSelectedBrand("")}
+                className="rounded-none border-2 border-black bg-orange-200 text-black font-bold cursor-pointer hover:bg-red-100 flex items-center gap-1"
+              >
+                {selectedBrand}
                 <X className="w-3 h-3 ml-1" />
               </Badge>
             )}

@@ -23,6 +23,7 @@ cloudinary.config({
 
 const PRODUCT_IMAGES_FOLDER = "products";
 const PRODUCT_CONTENT_IMAGES_FOLDER = "product-content";
+const BRAND_LOGOS_FOLDER = "brands";
 
 function uploadImageToFolder(
   file: File,
@@ -62,6 +63,16 @@ export function uploadContentImage(
   file: File
 ): Promise<{ publicId: string; url: string }> {
   return uploadImageToFolder(file, PRODUCT_CONTENT_IMAGES_FOLDER);
+}
+
+export function uploadBrandLogo(
+  file: File
+): Promise<{ publicId: string; url: string }> {
+  return uploadImageToFolder(file, BRAND_LOGOS_FOLDER);
+}
+
+export async function deleteBrandLogo(publicId: string): Promise<void> {
+  await cloudinary.uploader.destroy(publicId);
 }
 
 export async function deleteProductImage(publicId: string): Promise<void> {

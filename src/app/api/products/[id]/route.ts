@@ -84,6 +84,7 @@ export async function PUT(
   const sectionsRaw = formData.get("sections") as string | null;
   const categorySlug = (formData.get("categorySlug") as string)?.trim();
   const subCategorySlug = (formData.get("subCategorySlug") as string)?.trim() || undefined;
+  const brandIdRaw = (formData.get("brandId") as string)?.trim();
 
   if (name) updateData.name = name;
   if (name && name !== existing.name) {
@@ -150,11 +151,20 @@ export async function PUT(
     updateData.subCategoryId = categoryIds.subCategoryId ?? null;
   }
 
+  if (brandIdRaw) {
+    const brandExists = await prisma.brand.findFirst({ where: { id: brandIdRaw } });
+    if (!brandExists) {
+      await deleteProductImages(newlyUploaded.map((i) => i.publicId));
+      return NextResponse.json({ error: "Invalid brand" }, { status: 400 });
+    }
+    updateData.brandId = brandIdRaw;
+  }
+
   try {
     const product = await prisma.product.update({
       where: { id },
       data: updateData,
-      include: { category: true, subCategory: true },
+      include: { category: true, subCategory: true, brand: true },
     });
 
     // Only delete replaced/removed Cloudinary assets after the DB update succeeds

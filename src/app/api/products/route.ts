@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
   const description = (formData.get("description") as string)?.trim();
   const categorySlug = (formData.get("categorySlug") as string)?.trim();
   const subCategorySlug = (formData.get("subCategorySlug") as string)?.trim() || undefined;
+  const brandId = (formData.get("brandId") as string)?.trim();
   let sections: string[] = [];
   try {
     sections = sanitizeSections(JSON.parse((formData.get("sections") as string) ?? "[]"));
@@ -53,6 +54,13 @@ export async function POST(request: NextRequest) {
       { error: "Name, price, and category are required" },
       { status: 400 }
     );
+  }
+  if (!brandId) {
+    return NextResponse.json({ error: "Brand is required" }, { status: 400 });
+  }
+  const brandExists = await prisma.brand.findFirst({ where: { id: brandId } });
+  if (!brandExists) {
+    return NextResponse.json({ error: "Invalid brand" }, { status: 400 });
   }
   const shortDescriptionWords = countWords(shortDescription ?? "");
   if (shortDescriptionWords === 0) {
@@ -123,10 +131,11 @@ export async function POST(request: NextRequest) {
         images: gallery,
         categoryId: categoryIds.categoryId,
         subCategoryId: categoryIds.subCategoryId ?? undefined,
+        brandId,
         userId: session.user.id,
         accountId: account.id,
       },
-      include: { category: true, subCategory: true },
+      include: { category: true, subCategory: true, brand: true },
     });
     return NextResponse.json({ product: mapAdminProduct(product) }, { status: 201 });
   } catch (err) {
@@ -144,7 +153,7 @@ export async function GET(request: NextRequest) {
 
   const products = await prisma.product.findMany({
     orderBy: { createdAt: "desc" },
-    include: { category: true, subCategory: true },
+    include: { category: true, subCategory: true, brand: true },
   });
 
   return NextResponse.json({ products: products.map(mapAdminProduct) });
